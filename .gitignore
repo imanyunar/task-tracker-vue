@@ -1,0 +1,46 @@
+# Frontend .gitignore
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
+frontend/*.log
+frontend/.DS_Store
+
+# Backend .gitignore
+backend/.env
+backend/.env.local
+backend/vendor/
+backend/node_modules/
+backend/dist/
+backend/storage/
+backend/.DS_Store
+backend/*.log
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor directories and files
+.editorconfig
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
