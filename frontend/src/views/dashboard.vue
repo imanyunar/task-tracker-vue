@@ -82,142 +82,206 @@ const nextPage = () => {
 const prevPage = () => {
   if (currentPage.value > 1) currentPage.value--
 }
+
+const getStatusColor = (status) => {
+  const statusLower = (status || '').toLowerCase()
+  if (statusLower.includes('selesai') || statusLower.includes('completed') || statusLower.includes('done')) return 'success'
+  if (statusLower.includes('proses') || statusLower.includes('progress') || statusLower.includes('doing')) return 'primary'
+  if (statusLower.includes('tertunda') || statusLower.includes('pending') || statusLower.includes('todo')) return 'warning'
+  return 'warning'
+}
 </script>
 
 <template>
-  <div class="main-viewport">
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-    <div class="blob blob-3"></div>
-
-    <div class="dashboard-wrapper">
-      <header class="top-header glass-panel">
-        <div class="header-left">
-          <h1>{{ isViewAll ? 'Daftar Tugas' : 'Overview' }}</h1>
-          <p>Selamat datang kembali, <strong>{{ user?.name }}</strong>!</p>
-        </div>
-        <div class="header-right">
-          <div class="user-badges">
-            <span class="badge role">{{ user?.role?.name || 'User' }}</span>
-            <span class="badge dept">{{ user?.department?.name || 'Department' }}</span>
-          </div>
-          <div class="avatar-circle">
-            {{ user?.name?.charAt(0).toUpperCase() || 'U' }}
-          </div>
-        </div>
-      </header>
-
-      <div v-if="loading" class="loading-state">
-        <div class="spinner"></div>
-        <p>Menyinkronkan data...</p>
+  <div class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+    <div class="max-w-7xl mx-auto">
+      <!-- Header -->
+      <div class="mb-8 animate-slide-up">
+        <h1 class="text-4xl font-bold text-white mb-2">{{ isViewAll ? 'Semua Tugas' : 'Dashboard' }}</h1>
+        <p class="text-slate-400">Selamat datang kembali, <strong class="text-white">{{ user?.name }}</strong>!</p>
       </div>
 
-      <div v-else class="dashboard-grid fade-in">
-        
-        <div class="left-panel">
-          
-          <div v-if="!isViewAll" class="progress-cards-row">
-            <div class="glass-card metric-card">
-              <div class="metric-header">
-                <div class="icon-box green-box">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <!-- Loading State -->
+      <div v-if="loading" class="flex items-center justify-center py-32">
+        <div class="text-center">
+          <svg class="w-16 h-16 text-primary-500 mx-auto mb-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <p class="text-slate-400">Menyinkronkan data...</p>
+        </div>
+      </div>
+
+      <!-- Dashboard Grid -->
+      <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+        <!-- Main Panel -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- Metric Cards -->
+          <div v-if="!isViewAll" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Completion Rate -->
+            <div class="card-elevated animate-slide-up" style="animation-delay: 0.1s">
+              <div class="card-body">
+                <div class="flex items-start justify-between mb-4">
+                  <div>
+                    <p class="text-slate-400 text-sm font-medium mb-2">Tingkat Penyelesaian</p>
+                    <h2 class="text-3xl font-bold text-white">{{ stats.completionRate }}%</h2>
+                  </div>
+                  <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-success/20 text-success">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
                 </div>
-                <span>Completion Rate</span>
-              </div>
-              <div class="metric-body">
-                <h2>{{ stats.completionRate }}%</h2>
-                <div class="progress-track">
-                  <div class="progress-fill bg-green" :style="{ width: stats.completionRate + '%' }"></div>
+                <div class="w-full bg-slate-700 rounded-full h-2">
+                  <div class="bg-green-500 h-2 rounded-full transition-all" :style="{ width: stats.completionRate + '%' }"></div>
                 </div>
               </div>
             </div>
 
-            <div class="glass-card metric-card">
-              <div class="metric-header">
-                <div class="icon-box orange-box">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <!-- Timeliness Rate -->
+            <div class="card-elevated animate-slide-up" style="animation-delay: 0.2s">
+              <div class="card-body">
+                <div class="flex items-start justify-between mb-4">
+                  <div>
+                    <p class="text-slate-400 text-sm font-medium mb-2">Ketepatan Waktu</p>
+                    <h2 class="text-3xl font-bold text-white">{{ stats.timelinessRate }}%</h2>
+                  </div>
+                  <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-warning/20 text-warning">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
                 </div>
-                <span>Timeliness Rate</span>
-              </div>
-              <div class="metric-body">
-                <h2>{{ stats.timelinessRate }}%</h2>
-                <div class="progress-track">
-                  <div class="progress-fill bg-orange" :style="{ width: stats.timelinessRate + '%' }"></div>
+                <div class="w-full bg-slate-700 rounded-full h-2">
+                  <div class="bg-yellow-500 h-2 rounded-full transition-all" :style="{ width: stats.timelinessRate + '%' }"></div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="glass-card table-section">
-            <div class="section-header">
-              <h3>{{ isViewAll ? 'Semua Tugas Anda' : 'Tugas Terbaru' }}</h3>
-              <button @click="toggleViewAll" class="btn-text">
-                {{ isViewAll ? '← Kembali ke Overview' : 'Lihat Semua' }}
+          <!-- Tasks Table -->
+          <div class="card-elevated animate-slide-up" style="animation-delay: 0.3s">
+            <div class="card-header flex items-center justify-between">
+              <h3 class="text-lg font-semibold text-white">{{ isViewAll ? 'Semua Tugas' : 'Tugas Terbaru' }}</h3>
+              <button @click="toggleViewAll" class="text-primary-400 hover:text-primary-300 text-sm font-medium transition-colors">
+                {{ isViewAll ? '← Kembali' : 'Lihat Semua →' }}
               </button>
             </div>
-            
-            <div class="table-container">
-              <div v-if="allTasks.length === 0" class="empty-state">Belum ada tugas tersedia</div>
-              <table v-else class="data-table">
-                <thead>
-                  <tr>
-                    <th>Nama Tugas</th>
-                    <th>Project</th>
-                    <th>Tenggat Waktu</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="task in displayTasks" :key="task.id">
-                    <td class="primary-col">{{ task.title || task.name }}</td>
-                    <td class="text-muted">{{ task.project?.name || '-' }}</td>
-                    <td class="text-muted">{{ task.due_date || 'N/A' }}</td>
-                    <td>
-                      <span :class="['pill', `pill-${task.status?.toLowerCase().replace(/\s+/g, '-')}`]">
-                        {{ task.status }}
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
 
-            <div v-if="isViewAll && totalPages > 1" class="pagination-area">
-              <button class="page-btn" @click="prevPage" :disabled="currentPage === 1">Prev</button>
-              <span class="page-info">Halaman {{ currentPage }} dari {{ totalPages }}</span>
-              <button class="page-btn" @click="nextPage" :disabled="currentPage === totalPages">Next</button>
+            <div class="card-body">
+              <div v-if="allTasks.length === 0" class="text-center py-12">
+                <svg class="w-16 h-16 text-slate-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+                <p class="text-slate-400">Belum ada tugas</p>
+              </div>
+
+              <div v-else class="table-wrapper">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Nama Tugas</th>
+                      <th>Project</th>
+                      <th>Tenggat</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="task in displayTasks" :key="task.id">
+                      <td class="font-medium">{{ task.title || task.name }}</td>
+                      <td class="text-slate-400">{{ task.project?.name || '-' }}</td>
+                      <td class="text-slate-400 text-sm">{{ task.deadline?.split('T')[0] || task.due_date || 'N/A' }}</td>
+                      <td>
+                        <span :class="['badge', `badge-${getStatusColor(task.status)}`]">
+                          {{ task.status || 'Unknown' }}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Pagination -->
+              <div v-if="isViewAll && totalPages > 1" class="flex items-center justify-center gap-3 mt-6 pt-6 border-t border-slate-700">
+                <button @click="prevPage" :disabled="currentPage === 1" class="btn-secondary btn-sm" :class="{ 'opacity-50 cursor-not-allowed': currentPage === 1 }">Sebelumnya</button>
+                <span class="text-slate-400 text-sm">Halaman {{ currentPage }} dari {{ totalPages }}</span>
+                <button @click="nextPage" :disabled="currentPage === totalPages" class="btn-secondary btn-sm" :class="{ 'opacity-50 cursor-not-allowed': currentPage === totalPages }">Berikutnya</button>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="right-panel">
-          
-          <div class="glass-card score-card">
-            <div class="score-glow"></div>
-            <h4>Overall KPI Score</h4>
-            <div class="score-number">{{ stats.kpiScore }}</div>
-            <p class="score-desc">Berdasarkan penyelesaian & ketepatan waktu</p>
-          </div>
-
-          <div class="mini-stats-grid">
-            <div class="glass-card stat-box">
-              <p class="stat-label">Total Tugas</p>
-              <h3 class="stat-val">{{ stats.totalTasks }}</h3>
-            </div>
-            <div class="glass-card stat-box">
-              <p class="stat-label">Selesai</p>
-              <h3 class="stat-val text-green">{{ stats.completedTasks }}</h3>
-            </div>
-            <div class="glass-card stat-box">
-              <p class="stat-label">Tertunda</p>
-              <h3 class="stat-val text-orange">{{ stats.pendingTasks }}</h3>
-            </div>
-            <div class="glass-card stat-box">
-              <p class="stat-label">Project Aktif</p>
-              <h3 class="stat-val text-purple">{{ stats.totalProjects }}</h3>
+        <!-- Side Panel -->
+        <div class="space-y-6">
+          <!-- KPI Score Card -->
+          <div class="card-elevated text-center animate-slide-up" style="animation-delay: 0.1s">
+            <div class="card-body py-8">
+              <p class="text-slate-400 text-sm font-medium mb-3">Skor KPI</p>
+              <h2 class="text-5xl font-bold bg-gradient-primary bg-clip-text text-transparent">{{ stats.kpiScore }}</h2>
+              <p class="text-slate-500 text-xs mt-3">Penyelesaian & Ketepatan Waktu</p>
             </div>
           </div>
 
+          <!-- Stats Grid -->
+          <div class="space-y-3">
+            <!-- Total Tasks -->
+            <div class="card-elevated animate-slide-up" style="animation-delay: 0.2s">
+              <div class="card-body">
+                <p class="text-slate-400 text-sm mb-2">Total Tugas</p>
+                <h3 class="text-3xl font-bold text-white">{{ stats.totalTasks }}</h3>
+              </div>
+            </div>
+
+            <!-- Completed -->
+            <div class="card-elevated animate-slide-up" style="animation-delay: 0.3s">
+              <div class="card-body">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-slate-400 text-sm">Selesai</p>
+                    <h3 class="text-2xl font-bold text-green-400">{{ stats.completedTasks }}</h3>
+                  </div>
+                  <div class="text-green-500/20">
+                    <svg class="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pending -->
+            <div class="card-elevated animate-slide-up" style="animation-delay: 0.4s">
+              <div class="card-body">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-slate-400 text-sm">Tertunda</p>
+                    <h3 class="text-2xl font-bold text-yellow-400">{{ stats.pendingTasks }}</h3>
+                  </div>
+                  <div class="text-yellow-500/20">
+                    <svg class="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.2 3.2.9-1.6-4.6-2.6V7z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Active Projects -->
+            <div class="card-elevated animate-slide-up" style="animation-delay: 0.5s">
+              <div class="card-body">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-slate-400 text-sm">Project Aktif</p>
+                    <h3 class="text-2xl font-bold text-primary-400">{{ stats.totalProjects }}</h3>
+                  </div>
+                  <div class="text-primary-500/20">
+                    <svg class="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -225,158 +289,38 @@ const prevPage = () => {
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
-.main-viewport {
-  min-height: 100vh;
-  width: 100%;
-  background-color: #0a0c10;
-  color: #f8fafc;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  position: relative;
-  overflow-x: hidden;
-  padding-bottom: 40px;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* Glassmorphism Styles */
-.glass-panel, .glass-card {
-  background: rgba(30, 41, 59, 0.4);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.dashboard-wrapper {
-  max-width: 1300px;
-  margin: 0 auto;
-  padding: 24px;
-  position: relative;
-  z-index: 10;
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out;
 }
 
-/* Blobs */
-.blob {
-  position: absolute;
-  filter: blur(90px);
-  z-index: 0;
-  border-radius: 50%;
-  opacity: 0.25;
-}
-.blob-1 { width: 500px; height: 500px; background: #4f46e5; top: -150px; left: -100px; }
-.blob-2 { width: 400px; height: 400px; background: #a855f7; bottom: 10%; right: -50px; }
-.blob-3 { width: 300px; height: 300px; background: #3b82f6; top: 40%; left: 40%; opacity: 0.15; }
-
-/* Header */
-.top-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 30px;
-  margin-bottom: 30px;
-}
-.header-left h1 { font-size: 24px; font-weight: 800; margin: 0; letter-spacing: -0.5px; }
-.header-left p { margin: 4px 0 0; font-size: 14px; color: #94a3b8; }
-.header-right { display: flex; align-items: center; gap: 20px; }
-.badge { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; }
-.badge.role { background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); }
-.badge.dept { background: rgba(255, 255, 255, 0.05); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.1); }
-.avatar-circle {
-  width: 44px; height: 44px;
-  background: linear-gradient(135deg, #6366f1, #a855f7);
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 18px; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out forwards;
+  opacity: 0;
 }
 
-/* Grid */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
-  align-items: start;
-}
-
-/* Panel Left */
-.left-panel { display: flex; flex-direction: column; gap: 24px; }
-.progress-cards-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-.metric-card { padding: 24px; }
-.metric-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-.icon-box { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
-.green-box { background: rgba(16, 185, 129, 0.15); color: #10b981; }
-.orange-box { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
-.metric-body h2 { font-size: 32px; font-weight: 800; margin: 0 0 12px; }
-.progress-track { width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 10px; overflow: hidden; }
-.progress-fill { height: 100%; border-radius: 10px; transition: width 1s ease; }
-.bg-green { background: #10b981; }
-.bg-orange { background: #f59e0b; }
-
-/* Table Section */
-.table-section { padding: 24px; }
-.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.btn-text { background: none; border: none; color: #818cf8; font-weight: 600; font-size: 13px; cursor: pointer; }
-.btn-text:hover { color: #a855f7; text-decoration: underline; }
-
-.data-table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; }
-.data-table th { padding: 14px 16px; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.data-table td { padding: 16px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.03); }
-.primary-col { font-weight: 600; color: #f8fafc; }
-.text-muted { color: #94a3b8; }
-
-/* Status Pills */
-.pill { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; }
-.pill-todo, .pill-pending { background: rgba(245, 158, 11, 0.1); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); }
-.pill-doing, .pill-in-progress { background: rgba(99, 102, 241, 0.1); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.2); }
-.pill-done, .pill-completed { background: rgba(16, 185, 129, 0.1); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); }
-
-/* Pagination Area */
-.pagination-area {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  margin-top: 25px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-.page-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: 0.3s;
-}
-.page-btn:hover:not(:disabled) { background: #6366f1; border-color: #6366f1; }
-.page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.page-info { font-size: 14px; color: #94a3b8; }
-
-/* Panel Right */
-.right-panel { display: flex; flex-direction: column; gap: 24px; }
-.score-card { position: relative; padding: 40px 24px; text-align: center; overflow: hidden; }
-.score-glow { position: absolute; width: 150px; height: 150px; background: #6366f1; filter: blur(70px); top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.3; }
-.score-number { font-size: 64px; font-weight: 800; background: linear-gradient(to right, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px; }
-.mini-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.stat-box { padding: 20px 16px; text-align: center; }
-.stat-label { color: #94a3b8; font-size: 13px; margin-bottom: 8px; }
-.stat-val { font-size: 24px; font-weight: 800; margin: 0; }
-.text-green { color: #34d399; }
-.text-orange { color: #fbbf24; }
-.text-purple { color: #c084fc; }
-
-/* Utilities */
-.loading-state { text-align: center; padding: 100px 0; }
-.spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: #818cf8; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.fade-in { animation: fadeIn 0.8s ease-out; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-.empty-state { text-align: center; padding: 40px; color: #64748b; font-style: italic; }
-
-/* Responsive */
-@media (max-width: 1024px) {
-  .dashboard-grid { grid-template-columns: 1fr; }
-  .right-panel { order: -1; }
+[style*="animation-delay"] {
+  opacity: 1;
 }
 </style>

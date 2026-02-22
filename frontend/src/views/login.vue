@@ -9,13 +9,7 @@ const router = useRouter()
 const email = ref('')
 const password = ref('')
 const loading = ref(false)
-
-// Notification System State
-const notification = ref({
-  show: false,
-  message: '',
-  type: 'error' 
-})
+const notification = ref({ show: false, message: '', type: 'error' })
 
 const showNotify = (msg, type = 'error') => {
   notification.value = { show: true, message: msg, type }
@@ -52,276 +46,140 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="main-viewport">
-    <div class="login-page-container">
-      <div class="blob blob-1"></div>
-      <div class="blob blob-2"></div>
-      <div class="blob blob-3"></div>
+  <div class="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <!-- Animated background blobs -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+      <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob"></div>
+      <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-2000"></div>
+      <div class="absolute top-1/2 left-1/2 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-4000"></div>
+    </div>
 
-      <Transition name="toast">
-        <div v-if="notification.show" :class="['toast-wrapper', notification.type]">
-          <div class="toast-content">
-            <div class="toast-icon">
-              <span v-if="notification.type === 'success'">✓</span>
-              <span v-else>✕</span>
-            </div>
-            <div class="toast-text">
-              <strong>{{ notification.type === 'success' ? 'Berhasil' : 'Ups!' }}</strong>
-              <p>{{ notification.message }}</p>
-            </div>
-          </div>
-          <div class="progress-bar"></div>
+    <!-- Notification -->
+    <Transition name="slide">
+      <div v-if="notification.show" :class="['fixed top-6 right-6 z-50', notification.type === 'success' ? 'alert-success' : 'alert-danger']">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path v-if="notification.type === 'success'" fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+          <path v-else fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+        </svg>
+        <div>
+          <p class="font-semibold">{{ notification.type === 'success' ? 'Berhasil' : 'Gagal' }}</p>
+          <p class="text-sm opacity-90">{{ notification.message }}</p>
         </div>
-      </Transition>
+      </div>
+    </Transition>
 
-      <div class="login-card">
-        <header class="brand-section">
-          <div class="logo-circle">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+    <!-- Login Card -->
+    <div class="w-full max-w-md relative z-10 animate-slide-up">
+      <div class="card-elevated p-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-primary mb-4 shadow-glow-primary">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
           </div>
-          <h1>Task<span>Tracker</span></h1>
-          <p>Masuk untuk mengelola tugas harian Anda</p>
-        </header>
+          <h1 class="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">TaskTracker</h1>
+          <p class="text-slate-400 text-sm mt-2">Kelola tugas Anda dengan mudah dan efisien</p>
+        </div>
 
-        <form @submit.prevent="handleLogin" class="login-form">
-          <div class="input-stack">
-            <div class="form-group">
-              <label>Email Address</label>
-              <input 
-                v-model="email" 
-                type="email" 
-                placeholder="Masukkan email" 
-                required 
-              />
-            </div>
-
-            <div class="form-group">
-              <label>Password</label>
-              <input 
-                v-model="password" 
-                type="password" 
-                placeholder="••••••••" 
-                required 
-              />
-            </div>
+        <!-- Form -->
+        <form @submit.prevent="handleLogin" class="space-y-4">
+          <div class="form-group">
+            <label class="label-field">Email</label>
+            <input
+              v-model="email"
+              type="email"
+              class="input-field"
+              placeholder="nama@example.com"
+              required
+            />
           </div>
 
-          <button type="submit" class="btn-submit" :disabled="loading">
-            <span v-if="!loading">Sign In</span>
-            <div v-else class="loader"></div>
+          <div class="form-group">
+            <label class="label-field">Password</label>
+            <input
+              v-model="password"
+              type="password"
+              class="input-field"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <button type="submit" class="btn-primary w-full mt-6" :disabled="loading">
+            <span v-if="!loading" class="flex items-center justify-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+              </svg>
+              Masuk
+            </span>
+            <svg v-else class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
           </button>
         </form>
 
-        <footer class="footer-link">
-          Belum punya akun? <router-link to="/register">Daftar sekarang</router-link>
-        </footer>
+        <!-- Divider -->
+        <div class="flex items-center gap-3 my-6">
+          <div class="divider flex-1"></div>
+          <span class="text-xs text-slate-500 uppercase tracking-wide">atau</span>
+          <div class="divider flex-1"></div>
+        </div>
+
+        <!-- Footer -->
+        <p class="text-center text-slate-400 text-sm">
+          Belum punya akun?
+          <router-link to="/register" class="text-primary-400 hover:text-primary-300 font-semibold transition-colors">
+            Daftar sekarang
+          </router-link>
+        </p>
       </div>
+
+      <!-- Bottom decoration -->
+      <p class="text-center text-slate-600 text-xs mt-6">
+        © 2026 TaskTracker. Semua hak dilindungi.
+      </p>
     </div>
   </div>
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
-/* Main Container Fix */
-.main-viewport {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: #0a0c10;
-  display: flex;
-  font-family: 'Plus Jakarta Sans', sans-serif;
+.animate-blob {
+  animation: blob 7s infinite;
 }
 
-.login-page-container {
-  width: 100%;
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-  overflow: hidden;
-  padding: 20px;
+.animation-delay-2000 {
+  animation-delay: 2s;
 }
 
-/* Background Blobs */
-.blob {
-  position: absolute;
-  filter: blur(80px);
-  z-index: 0;
-  border-radius: 50%;
-  opacity: 0.4;
-  animation: move 20s infinite alternate;
-}
-.blob-1 { width: 450px; height: 450px; background: #4f46e5; top: -100px; right: -50px; }
-.blob-2 { width: 400px; height: 400px; background: #7c3aed; bottom: -50px; left: -100px; animation-delay: -5s; }
-.blob-3 { width: 300px; height: 300px; background: #2563eb; top: 20%; left: 10%; animation-delay: -10s; }
-
-@keyframes move {
-  from { transform: translate(0, 0) scale(1); }
-  to { transform: translate(40px, 80px) scale(1.1); }
+.animation-delay-4000 {
+  animation-delay: 4s;
 }
 
-/* Glassmorphism Card */
-.login-card {
-  position: relative;
-  z-index: 10;
-  width: 100%;
-  max-width: 420px;
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 32px;
-  padding: 40px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  animation: cardShow 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+@keyframes blob {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
 }
 
-@keyframes cardShow {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Brand Section */
-.brand-section {
-  text-align: center;
-  margin-bottom: 32px;
-}
-.logo-circle {
-  width: 50px;
-  height: 50px;
-  background: linear-gradient(135deg, #6366f1, #a855f7);
-  border-radius: 14px;
-  margin: 0 auto 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
-}
-.logo-circle svg { width: 24px; }
-.brand-section h1 {
-  color: #fff;
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -1px;
-}
-.brand-section h1 span { color: #818cf8; }
-.brand-section p { color: #94a3b8; font-size: 14px; margin-top: 6px; }
-
-/* Form Styles */
-.input-stack { display: grid; gap: 20px; }
-.form-group { display: flex; flex-direction: column; gap: 8px; }
-.form-group label { color: #cbd5e1; font-size: 13px; font-weight: 600; padding-left: 4px; }
-
-input {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  padding: 14px 18px;
-  color: #fff;
-  font-size: 15px;
+.slide-enter-active,
+.slide-leave-active {
   transition: all 0.3s ease;
 }
 
-input:focus {
-  outline: none;
-  border-color: #6366f1;
-  background: rgba(30, 41, 59, 0.8);
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+.slide-enter-from {
+  transform: translateX(100px);
+  opacity: 0;
 }
 
-/* Submit Button */
-.btn-submit {
-  width: 100%;
-  margin-top: 32px;
-  padding: 15px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  color: white;
-  border: none;
-  border-radius: 14px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.3s;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-.btn-submit:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px -6px rgba(99, 102, 241, 0.5);
-  filter: brightness(1.1);
-}
-.btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-
-/* Toast Notification (Sama dengan Register) */
-.toast-wrapper {
-  position: fixed; top: 30px; right: 30px; z-index: 1000;
-  min-width: 320px; padding: 16px; border-radius: 16px;
-  background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4); overflow: hidden;
-}
-.toast-content { display: flex; align-items: center; gap: 16px; }
-.toast-icon {
-  width: 32px; height: 32px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; font-weight: bold;
-}
-.error .toast-icon { background: #ef4444; color: white; }
-.success .toast-icon { background: #10b981; color: white; }
-.toast-text strong { display: block; color: #fff; font-size: 14px; }
-.toast-text p { color: #94a3b8; font-size: 13px; margin: 0; }
-.progress-bar { position: absolute; bottom: 0; left: 0; height: 4px; width: 100%; }
-.error .progress-bar { background: #ef4444; animation: countdown 4s linear; }
-.success .progress-bar { background: #10b981; animation: countdown 4s linear; }
-
-@keyframes countdown { from { width: 100%; } to { width: 0%; } }
-
-.toast-enter-active { animation: toastIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-.toast-leave-active { animation: toastIn 0.4s reverse cubic-bezier(0.6, -0.28, 0.735, 0.045); }
-@keyframes toastIn {
-  0% { transform: translateX(100px) scale(0.8); opacity: 0; }
-  100% { transform: translateX(0) scale(1); opacity: 1; }
-}
-
-.loader {
-  width: 20px; height: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff; border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.footer-link {
-  text-align: center;
-  margin-top: 24px;
-  color: #94a3b8;
-  font-size: 14px;
-}
-.footer-link a { color: #818cf8; text-decoration: none; font-weight: 700; }
-.footer-link a:hover { text-decoration: underline; }
-
-/* Responsive HP */
-@media (max-width: 480px) {
-  .login-card { padding: 30px 20px; }
-}
-</style>
-
-<style>
-html, body {
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  background-color: #0a0c10;
-  overflow-x: hidden;
-}
-#app {
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
+.slide-leave-to {
+  transform: translateX(100px);
+  opacity: 0;
 }
 </style>

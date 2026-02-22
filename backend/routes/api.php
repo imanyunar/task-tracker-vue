@@ -36,6 +36,7 @@ Route::middleware('auth')->group(function () {
         return response()->file(public_path('profile.html')); 
     });
     Route::get('/profile', [ProfileController::class, 'show']);
+    Route::put('/profile', [ProfileController::class, 'update']);
     Route::get('/dashboard-stats', [TaskController::class, 'getDashboardStats']);
     Route::apiResource('/departments', DepartmentController::class);
     Route::apiResource('/users', UserController::class);
