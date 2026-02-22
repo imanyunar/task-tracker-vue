@@ -93,7 +93,7 @@ const getStatusColor = (status) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+  <div class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 pt-24 p-6">
     <div class="max-w-7xl mx-auto">
       <!-- Header -->
       <div class="mb-8 animate-slide-up">

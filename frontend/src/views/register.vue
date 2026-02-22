@@ -29,6 +29,9 @@ const showNotify = (msg, type = 'error') => {
 }
 
 const handleSubmit = async () => {
+  if (!form.value.name || !form.value.email || !form.value.password || !form.value.department) {
+    return showNotify('Mohon isi semua field yang diperlukan', 'error')
+  }
   if (form.value.password !== form.value.password_confirmation) {
     return showNotify('Password tidak cocok', 'error')
   }
@@ -39,7 +42,9 @@ const handleSubmit = async () => {
     showNotify('Pendaftaran berhasil! Selamat datang.', 'success')
     setTimeout(() => router.push('/dashboard'), 1500)
   } catch (err) {
-    showNotify(err.response?.data?.message || 'Pendaftaran gagal', 'error')
+    const errorMsg = err.response?.data?.message || err.response?.data?.errors?.email?.[0] || 'Pendaftaran gagal'
+    showNotify(errorMsg, 'error')
+    console.error('Register error:', err.response?.data)
   } finally {
     isSubmitting.value = false
   }

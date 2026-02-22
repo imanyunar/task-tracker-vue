@@ -40,7 +40,7 @@ export const useAuthStore = defineStore('auth', {
       email: string
       password: string
       password_confirmation: string
-      department_id?: string
+      department?: string | number
     }) {
       const res = await authService.register(userData)
       this.token = res.data.api_token

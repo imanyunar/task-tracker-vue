@@ -1,26 +1,29 @@
 <template>
-  <router-view v-slot="{ Component }">
-    <transition name="page-slide" mode="out-in">
-      <component :is="Component" />
-    </transition>
-  </router-view>
+  <div>
+    <!-- Navbar hanya tampil untuk authenticated users -->
+    <Navbar v-if="authStore.isAuthenticated" />
+    
+    <router-view v-slot="{ Component }">
+      <transition name="page-slide" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </router-view>
+  </div>
 </template>
 
 <script setup>
 import { onMounted } from 'vue'
 import { useAuthStore } from './stores/auth'
+import Navbar from './components/Navbar.vue'
 
 const authStore = useAuthStore()
 
-onMounted(async () => {
-  const token = localStorage.getItem('token')
-  // Validasi token sebelum hit API untuk mencegah 401 di awal load
-  if (token && token !== 'undefined' && token !== 'null') {
-    try {
-      await authStore.fetchProfile()
-    } catch (error) {
-      authStore.logout()
-    }
+onMounted(() => {
+  const token = localStorage.getItem('api_token')
+  if (token && token !== 'undefined' && token !== 'null' && token.length > 0) {
+    authStore.fetchProfile().catch(() => {
+      // Silently fail - render page anyway
+    })
   }
 })
 </script>
