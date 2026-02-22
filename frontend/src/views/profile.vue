@@ -69,7 +69,7 @@ const handleSave = async () => {
       <!-- Header -->
       <div class="mb-8 animate-slide-up">
         <h1 class="text-4xl font-bold text-white mb-2">Profil Saya</h1>
-        <p class="text-slate-400">Kelola informasi pribadi dan pengaturan akun Anda</p>
+        <p class="text-slate-300">Kelola informasi pribadi dan pengaturan akun Anda</p>
       </div>
 
       <!-- Loading State -->
@@ -92,7 +92,7 @@ const handleSave = async () => {
               </div>
               <div>
                 <h2 class="text-2xl font-bold text-white">{{ userStore.profile.name }}</h2>
-                <p class="text-slate-400 mt-1">{{ userStore.profile.email }}</p>
+                <p class="text-slate-300 mt-1">{{ userStore.profile.email }}</p>
                 <div class="flex gap-2 mt-3">
                   <span class="badge badge-primary">{{ userStore.profile.role?.name || 'N/A' }}</span>
                   <span class="badge badge-primary">{{ userStore.profile.department?.name || 'N/A' }}</span>

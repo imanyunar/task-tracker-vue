@@ -98,7 +98,7 @@ const getStatusColor = (status) => {
       <!-- Header -->
       <div class="mb-8 animate-slide-up">
         <h1 class="text-4xl font-bold text-white mb-2">{{ isViewAll ? 'Semua Tugas' : 'Dashboard' }}</h1>
-        <p class="text-slate-400">Selamat datang kembali, <strong class="text-white">{{ user?.name }}</strong>!</p>
+        <p class="text-slate-300">Selamat datang kembali, <strong class="text-white">{{ user?.name }}</strong>!</p>
       </div>
 
       <!-- Loading State -->
@@ -107,7 +107,7 @@ const getStatusColor = (status) => {
           <svg class="w-16 h-16 text-primary-500 mx-auto mb-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          <p class="text-slate-400">Menyinkronkan data...</p>
+          <p class="text-slate-300">Menyinkronkan data...</p>
         </div>
       </div>
 
@@ -122,7 +122,7 @@ const getStatusColor = (status) => {
               <div class="card-body">
                 <div class="flex items-start justify-between mb-4">
                   <div>
-                    <p class="text-slate-400 text-sm font-medium mb-2">Tingkat Penyelesaian</p>
+                    <p class="text-slate-300 text-sm font-medium mb-2">Tingkat Penyelesaian</p>
                     <h2 class="text-3xl font-bold text-white">{{ stats.completionRate }}%</h2>
                   </div>
                   <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-success/20 text-success">
@@ -142,7 +142,7 @@ const getStatusColor = (status) => {
               <div class="card-body">
                 <div class="flex items-start justify-between mb-4">
                   <div>
-                    <p class="text-slate-400 text-sm font-medium mb-2">Ketepatan Waktu</p>
+                    <p class="text-slate-300 text-sm font-medium mb-2">Ketepatan Waktu</p>
                     <h2 class="text-3xl font-bold text-white">{{ stats.timelinessRate }}%</h2>
                   </div>
                   <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-warning/20 text-warning">
@@ -169,10 +169,10 @@ const getStatusColor = (status) => {
 
             <div class="card-body">
               <div v-if="allTasks.length === 0" class="text-center py-12">
-                <svg class="w-16 h-16 text-slate-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-16 h-16 text-slate-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                 </svg>
-                <p class="text-slate-400">Belum ada tugas</p>
+                <p class="text-slate-300">Belum ada tugas</p>
               </div>
 
               <div v-else class="table-wrapper">
@@ -188,8 +188,8 @@ const getStatusColor = (status) => {
                   <tbody>
                     <tr v-for="task in displayTasks" :key="task.id">
                       <td class="font-medium">{{ task.title || task.name }}</td>
-                      <td class="text-slate-400">{{ task.project?.name || '-' }}</td>
-                      <td class="text-slate-400 text-sm">{{ task.deadline?.split('T')[0] || task.due_date || 'N/A' }}</td>
+                      <td class="text-slate-300">{{ task.project?.name || '-' }}</td>
+                      <td class="text-slate-300 text-sm">{{ task.deadline?.split('T')[0] || task.due_date || 'N/A' }}</td>
                       <td>
                         <span :class="['badge', `badge-${getStatusColor(task.status)}`]">
                           {{ task.status || 'Unknown' }}
@@ -203,7 +203,7 @@ const getStatusColor = (status) => {
               <!-- Pagination -->
               <div v-if="isViewAll && totalPages > 1" class="flex items-center justify-center gap-3 mt-6 pt-6 border-t border-slate-700">
                 <button @click="prevPage" :disabled="currentPage === 1" class="btn-secondary btn-sm" :class="{ 'opacity-50 cursor-not-allowed': currentPage === 1 }">Sebelumnya</button>
-                <span class="text-slate-400 text-sm">Halaman {{ currentPage }} dari {{ totalPages }}</span>
+                <span class="text-slate-300 text-sm">Halaman {{ currentPage }} dari {{ totalPages }}</span>
                 <button @click="nextPage" :disabled="currentPage === totalPages" class="btn-secondary btn-sm" :class="{ 'opacity-50 cursor-not-allowed': currentPage === totalPages }">Berikutnya</button>
               </div>
             </div>
@@ -215,9 +215,9 @@ const getStatusColor = (status) => {
           <!-- KPI Score Card -->
           <div class="card-elevated text-center animate-slide-up" style="animation-delay: 0.1s">
             <div class="card-body py-8">
-              <p class="text-slate-400 text-sm font-medium mb-3">Skor KPI</p>
+              <p class="text-slate-300 text-sm font-medium mb-3">Skor KPI</p>
               <h2 class="text-5xl font-bold bg-gradient-primary bg-clip-text text-transparent">{{ stats.kpiScore }}</h2>
-              <p class="text-slate-500 text-xs mt-3">Penyelesaian & Ketepatan Waktu</p>
+              <p class="text-slate-400 text-xs mt-3">Penyelesaian & Ketepatan Waktu</p>
             </div>
           </div>
 
@@ -226,7 +226,7 @@ const getStatusColor = (status) => {
             <!-- Total Tasks -->
             <div class="card-elevated animate-slide-up" style="animation-delay: 0.2s">
               <div class="card-body">
-                <p class="text-slate-400 text-sm mb-2">Total Tugas</p>
+                <p class="text-slate-300 text-sm mb-2">Total Tugas</p>
                 <h3 class="text-3xl font-bold text-white">{{ stats.totalTasks }}</h3>
               </div>
             </div>
@@ -236,7 +236,7 @@ const getStatusColor = (status) => {
               <div class="card-body">
                 <div class="flex items-center justify-between">
                   <div>
-                    <p class="text-slate-400 text-sm">Selesai</p>
+                    <p class="text-slate-300 text-sm">Selesai</p>
                     <h3 class="text-2xl font-bold text-green-400">{{ stats.completedTasks }}</h3>
                   </div>
                   <div class="text-green-500/20">
@@ -253,7 +253,7 @@ const getStatusColor = (status) => {
               <div class="card-body">
                 <div class="flex items-center justify-between">
                   <div>
-                    <p class="text-slate-400 text-sm">Tertunda</p>
+                    <p class="text-slate-300 text-sm">Tertunda</p>
                     <h3 class="text-2xl font-bold text-yellow-400">{{ stats.pendingTasks }}</h3>
                   </div>
                   <div class="text-yellow-500/20">
@@ -270,7 +270,7 @@ const getStatusColor = (status) => {
               <div class="card-body">
                 <div class="flex items-center justify-between">
                   <div>
-                    <p class="text-slate-400 text-sm">Project Aktif</p>
+                    <p class="text-slate-300 text-sm">Project Aktif</p>
                     <h3 class="text-2xl font-bold text-primary-400">{{ stats.totalProjects }}</h3>
                   </div>
                   <div class="text-primary-500/20">

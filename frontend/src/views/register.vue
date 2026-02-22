@@ -79,8 +79,10 @@ const handleSubmit = async () => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
           </div>
-          <h1 class="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Buat Akun</h1>
-          <p class="text-slate-400 text-sm mt-2">Bergabunglah dan kelola tugas Anda dengan lebih baik</p>
+          <h1 class="text-3xl font-bold text-white">Buat Akun</h1>
+          <div class="mt-4 px-4 py-3 rounded-lg" style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);">
+            <p class="text-slate-100 text-sm font-medium">Bergabunglah dan kelola tugas Anda dengan lebih baik</p>
+          </div>
         </div>
 
         <!-- Form -->
@@ -161,21 +163,21 @@ const handleSubmit = async () => {
         <!-- Divider -->
         <div class="flex items-center gap-3 my-6">
           <div class="divider flex-1"></div>
-          <span class="text-xs text-slate-500 uppercase tracking-wide">atau</span>
+          <span class="text-xs text-slate-400 uppercase tracking-wide">atau</span>
           <div class="divider flex-1"></div>
         </div>
 
         <!-- Footer -->
-        <p class="text-center text-slate-400 text-sm">
+        <p class="text-center text-slate-300 text-sm">
           Sudah punya akun?
-          <router-link to="/login" class="text-primary-400 hover:text-primary-300 font-semibold transition-colors">
+          <router-link to="/login" class="text-primary-300 hover:text-primary-200 font-semibold transition-colors">
             Masuk di sini
           </router-link>
         </p>
       </div>
 
       <!-- Bottom decoration -->
-      <p class="text-center text-slate-600 text-xs mt-6">
+      <p class="text-center text-slate-500 text-xs mt-6">
         © 2026 TaskTracker. Semua hak dilindungi.
       </p>
     </div>

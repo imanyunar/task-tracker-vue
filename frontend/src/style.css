@@ -5,13 +5,14 @@
 /* Dark mode base styles */
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100;
+    @apply bg-slate-950 text-slate-50;
   }
 
-  h1 { @apply text-4xl font-bold; }
-  h2 { @apply text-3xl font-bold; }
-  h3 { @apply text-2xl font-semibold; }
-  h4 { @apply text-xl font-semibold; }
+  h1 { @apply text-4xl font-bold text-slate-50; }
+  h2 { @apply text-3xl font-bold text-slate-100; }
+  h3 { @apply text-2xl font-semibold text-slate-100; }
+  h4 { @apply text-xl font-semibold text-slate-200; }
+  p { @apply text-slate-200; }
 
   select option {
     background-color: #0f172a;
@@ -93,7 +94,7 @@
 
   /* Input fields */
   .input-field {
-    @apply w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 transition-all duration-200;
+    @apply w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-slate-50 placeholder-slate-300 transition-all duration-200;
   }
 
   .input-field:focus {
@@ -112,7 +113,7 @@
     padding-right: 2.5rem;
   }
 
-  .label-field { @apply block text-sm font-medium text-slate-300 mb-2; }
+  .label-field { @apply block text-sm font-medium text-slate-200 mb-2; }
 
   /* Form group */
   .form-group { @apply mb-4; }
@@ -188,8 +189,12 @@
 
   /* Text utilities */
   .divider {
-    @apply h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent;
+    @apply h-px bg-gradient-to-r from-transparent via-slate-600 to-transparent;
   }
+
+  .text-primary { @apply text-primary-300; }
+  .text-secondary { @apply text-slate-300; }
+  .text-muted { @apply text-slate-400; }
 }
 
 /* Animations */
