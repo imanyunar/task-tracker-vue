@@ -26,25 +26,25 @@ Route::post('/login', [AuthController::class, 'login']);
 // ==========================================
 // PROTECTED ROUTES (Wajib login / memiliki token)
 // ==========================================
-Route::middleware('auth')->group(function () {
+Route::middleware('auth.manual')->group(function () {
     
     // ------------------------------------------
     // 1. RUTE HTML VIEWS
     // ------------------------------------------
     Route::get('/dashboard', function () {
-        return response()->file(public_path('dashboard.html'));
+        return response()->file(public_path('dashboard.vue'));
     });
     
     Route::get('/tasks-view', function () {
-        return response()->file(public_path('tasks.html'));
+        return response()->file(public_path('tasks.vue'));
     });
     
     Route::get('/projects-view', function () {
-        return response()->file(public_path('projects.html'));
+        return response()->file(public_path('projects.vue'));
     });
 
     Route::get('/profile-view', function () { 
-        return response()->file(public_path('profile.html')); 
+        return response()->file(public_path('profile.vue')); 
     });
 
     // ------------------------------------------

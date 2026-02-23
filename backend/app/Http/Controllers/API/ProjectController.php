@@ -13,140 +13,132 @@ class ProjectController extends Controller
 {
     /**
      * Display a listing of projects
-     * Employee: hanya projek yang mereka ikuti
-     * Admin/Manager: semua projek
+     * Role 3 (Employee): hanya melihat proyek yang mereka ikuti
+     * Admin/Manager: melihat semua proyek
      */
     public function index(Request $request)
     {
         $user = $request->user();
+        
+        $query = Project::with('members')->withCount([
+            'tasks', 
+            'tasks as completed_tasks_count' => function ($q) {
+                $q->where('status', 'done');
+            }
+        ]);
 
-        if ($user->role->name === 'employee') {
-            $projects = Project::whereHas('members', function($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })->paginate(10);
-        } else {
-            $projects = Project::paginate(10);
+        // Jika user adalah Employee (Role ID 3)
+        if ($user->role_id == 3) {
+            $query->whereHas('members', function($q) use ($user) {
+                $q->where('user_id', $user->id);
+            });
         }
+     
+        $projects = $query->paginate(10);
 
-        // Response format: {data: [...], links: [...], current_page: ...}
-        return response()->json($projects, 200);
+        $projects->getCollection()->transform(function ($project) {
+            $total = $project->tasks_count;
+            $completed = $project->completed_tasks_count;
+            $project->progress = $total > 0 ? round(($completed / $total) * 100, 2) : 0;
+            return $project;
+        });
+
+        return response()->json($projects);
     }
 
     /**
      * Store a newly created project
-     * Only admin/manager can create
+     * Hanya Admin/Manager yang bisa membuat
      */
     public function store(Request $request)
-    {
-        $user = $request->user();
-        
-        if ($user->role->name === 'employee') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Akses ditolak'
-            ], 403);
-        }
+{
+    $user = $request->user(); // Diambil dari ManualTokenAuth
 
-        $validator = Validator::make($request->all(), [
-            'name'        => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'start_date'  => 'required|date',
-            'end_date'    => 'required|date|after:start_date',
-        ]);
+    // DEBUG: Tambahkan ini sementara untuk melihat ID role di log jika masih tembus
+    // \Log::info('User Role ID: ' . $user->role_id);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $project = Project::create($request->all());
-        
+    // Gunakan (int) untuk memastikan tipe data angka
+    if (!$user || (int)$user->role_id === 3) { 
         return response()->json([
-            'success' => true,
-            'message' => 'Projek berhasil dibuat',
-            'data' => $project
-        ], 201);
+            'success' => false,
+            'message' => 'Akses ditolak: Anda tidak memiliki izin untuk membuat proyek'
+        ], 403);
     }
+
+    // Validasi data
+    $validator = Validator::make($request->all(), [
+        'name'        => 'required|string|max:255',
+        'start_date'  => 'required|date',
+        'end_date'    => 'required|date|after:start_date',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+    }
+
+    $project = Project::create($request->all());
+    
+    return response()->json([
+        'success' => true,
+        'message' => 'Projek berhasil dibuat',
+        'data' => $project
+    ], 201);
+}
 
     /**
      * Display the specified project
-     * Employee: hanya jika mereka anggota projek
-     * Admin/Manager: semua projek
      */
     public function show(Request $request, $id)
     {
         $user = $request->user();
         
-        if ($user->role->name === 'employee') {
-            $project = Project::where('id', $id)
-                ->whereHas('members', function($query) use ($user) {
-                    $query->where('user_id', $user->id);
+        $query = Project::with(['members', 'tasks']);
+
+        if ($user->role_id == 3) {
+            $project = $query->where('id', $id)
+                ->whereHas('members', function($q) use ($user) {
+                    $q->where('user_id', $user->id);
                 })->first();
 
             if (!$project) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Project tidak ditemukan atau akses ditolak'
+                    'message' => 'Proyek tidak ditemukan atau Anda bukan anggota tim'
                 ], 404);
             }
         } else {
-            $project = Project::find($id);
-            
+            $project = $query->find($id);
             if (!$project) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Project tidak ditemukan'
-                ], 404);
+                return response()->json(['success' => false, 'message' => 'Project tidak ditemukan'], 404);
             }
         }
-
-        // Load relationships
-        $project->load('members');
         
-        return response()->json([
-            'success' => true,
-            'data' => $project
-        ], 200);
+        return response()->json(['success' => true, 'data' => $project], 200);
     }
 
     /**
      * Update the specified project
-     * Only admin/manager can update
      */
     public function update(Request $request, $id)
     {
         $user = $request->user();
         
-        if ($user->role->name === 'employee') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Akses ditolak'
-            ], 403);
+        if ($user->role_id == 3) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak'], 403);
         }
 
         $project = Project::find($id);
-        
         if (!$project) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Project tidak ditemukan'
-            ], 404);
+            return response()->json(['success' => false, 'message' => 'Project tidak ditemukan'], 404);
         }
 
         $validator = Validator::make($request->all(), [
             'name'        => 'sometimes|string|max:255',
-            'description' => 'nullable|string',
-            'start_date'  => 'sometimes|date',
             'end_date'    => 'sometimes|date|after:start_date',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
         $project->update($request->all());
@@ -160,63 +152,39 @@ class ProjectController extends Controller
 
     /**
      * Remove the specified project
-     * Only admin/manager can delete
      */
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
         
-        if ($user->role->name === 'employee') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Akses ditolak'
-            ], 403);
+        if ($user->role_id == 3) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak'], 403);
         }
 
         $project = Project::find($id);
-        
         if (!$project) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Project tidak ditemukan'
-            ], 404);
+            return response()->json(['success' => false, 'message' => 'Project tidak ditemukan'], 404);
         }
 
         $project->delete();
         
-        return response()->json([
-            'success' => true,
-            'message' => 'Project berhasil dihapus'
-        ], 200);
+        return response()->json(['success' => true, 'message' => 'Project berhasil dihapus'], 200);
     }
 
     /**
-     * Search projects by name
-     * Employee: hanya projek yang mereka ikuti
-     * Admin/Manager: semua projek
-     * PostgreSQL: menggunakan ILIKE untuk case-insensitive search
+     * Search projects
      */
     public function search(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'search' => 'nullable|string|max:255'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
         $user = $request->user();
         $katakunci = $request->input('search', '');
         
-        // PostgreSQL: ILIKE untuk case-insensitive search
-        $query = Project::where('name', 'ILIKE', "%$katakunci%")
-                       ->orWhere('description', 'ILIKE', "%$katakunci%");
+        $query = Project::where(function($q) use ($katakunci) {
+            $q->where('name', 'ILIKE', "%$katakunci%")
+              ->orWhere('description', 'ILIKE', "%$katakunci%");
+        });
         
-        if ($user->role->name === 'employee') {
+        if ($user->role_id == 3) {
             $query->whereHas('members', function($q) use ($user) {
                 $q->where('user_id', $user->id);
             });
@@ -224,7 +192,6 @@ class ProjectController extends Controller
         
         $projects = $query->get();
         
-        // FIXED: Consistent response format
         return response()->json([
             'success' => true,
             'data' => $projects,
@@ -234,17 +201,13 @@ class ProjectController extends Controller
 
     /**
      * Add member to project
-     * Only admin/manager can add members
      */
     public function addMember(Request $request, $id)
     {
         $user = $request->user();
         
-        if ($user->role->name === 'employee') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Akses ditolak'
-            ], 403);
+        if ($user->role_id == 3) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak'], 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -252,43 +215,26 @@ class ProjectController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
         $project = Project::find($id);
-        
         if (!$project) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Project tidak ditemukan'
-            ], 404);
+            return response()->json(['success' => false, 'message' => 'Project tidak ditemukan'], 404);
         }
 
-        // Check if user is already a member
-        $isMember = $project->members()->where('user_id', $request->user_id)->exists();
-        
-        if ($isMember) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User sudah menjadi anggota projek ini'
-            ], 422);
+        if ($project->members()->where('user_id', $request->user_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'User sudah menjadi anggota'], 422);
         }
 
-        // Add member with role
         $project->members()->attach($request->user_id, [
             'role_in_project' => $request->role ?? 'Anggota Tim'
         ]);
 
-        // Load fresh members
-        $project->load('members');
-
         return response()->json([
             'success' => true,
-            'message' => 'Anggota berhasil ditambahkan ke tim projek',
-            'data' => $project
+            'message' => 'Anggota berhasil ditambahkan',
+            'data' => $project->load('members')
         ], 200);
     }
 }

@@ -119,7 +119,10 @@ export const taskService = {
 
 // ==================== PROJECT SERVICE ====================
 
+// ==================== PROJECT SERVICE ====================
+
 export const projectService = {
+  // Ubah Return Type menjadi AxiosResponse saja agar bisa membaca data pagination Laravel
   getAllProjects(page: number = 1): Promise<AxiosResponse> {
     return api.get(`/projects?page=${page}`)
   },
@@ -142,6 +145,13 @@ export const projectService = {
   
   addMember(projectId: number, payload: { user_id: number, role: string }): Promise<AxiosResponse> {
     return api.post(`/projects/${projectId}/members`, payload)
+  },
+
+  // Tambahkan fungsi ini agar error di useProjects.ts hilang
+  searchProjects(query: string): Promise<AxiosResponse> {
+    return api.get('/projects/search', {
+      params: { q: query }
+    })
   }
 }
 

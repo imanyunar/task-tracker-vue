@@ -1,19 +1,244 @@
+<template>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+      <div>
+        <h1 class="text-3xl font-black bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent m-0">
+          Tasks Management
+        </h1>
+        <p class="text-slate-400 text-sm mt-1">Kelola daftar tugas dan pantau progres kerja tim Anda.</p>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+        <div class="relative w-full sm:w-64">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg class="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input 
+            v-model="searchQuery" 
+            type="text" 
+            placeholder="Cari tugas..." 
+            class="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+          >
+        </div>
+
+        <button 
+          v-if="canCreate"
+          @click="openModal()"
+          class="flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 active:scale-95"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          Tambah Tugas
+        </button>
+      </div>
+    </div>
+
+    <div class="flex gap-4 mb-8 overflow-x-auto pb-2 scrollbar-hide">
+      <button 
+        v-for="status in ['all', 'todo', 'doing', 'review', 'done']" 
+        :key="status"
+        @click="filterStatus = status === 'all' ? '' : status"
+        :class="[
+          'px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border',
+          (filterStatus === status || (status === 'all' && filterStatus === '')) 
+            ? 'bg-indigo-500 text-white border-indigo-400 shadow-lg shadow-indigo-500/20' 
+            : 'bg-slate-800/40 text-slate-400 border-slate-700 hover:bg-slate-800'
+        ]"
+      >
+        {{ status === 'all' ? 'Semua' : getStatusLabel(status) }}
+      </button>
+    </div>
+
+    <div v-if="loading" class="flex flex-col items-center justify-center py-24">
+      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+      <p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Memuat Tugas...</p>
+    </div>
+
+    <div v-else-if="filteredTasks.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div 
+        v-for="task in filteredTasks" 
+        :key="task.id"
+        class="bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 hover:bg-slate-800/60 transition-all group flex flex-col hover:shadow-2xl hover:shadow-indigo-500/5"
+      >
+        <div class="flex justify-between items-start mb-4">
+          <div class="flex gap-2">
+            <span class="px-2 py-1 text-[10px] font-black uppercase rounded-lg border border-white/5" :style="{ backgroundColor: getPriorityColor(task.priority) + '20', color: getPriorityColor(task.priority) }">
+              {{ task.priority }}
+            </span>
+            <span class="px-2 py-1 text-[10px] font-black uppercase rounded-lg border border-white/5" :style="{ backgroundColor: getStatusColor(task.status) + '20', color: getStatusColor(task.status) }">
+              {{ getStatusLabel(task.status) }}
+            </span>
+          </div>
+          
+          <div v-if="canEditTask(task) || canDelete" class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button @click="openModal(task)" class="p-1.5 text-slate-400 hover:text-amber-400 bg-slate-700/30 rounded-lg transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+            </button>
+            <button v-if="canDelete" @click="deleteTask(task.id)" class="p-1.5 text-slate-400 hover:text-rose-400 bg-slate-700/30 rounded-lg transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <h3 class="text-lg font-bold text-white mb-2 group-hover:text-indigo-400 transition-colors">{{ task.title }}</h3>
+        <p class="text-slate-400 text-sm mb-6 line-clamp-2 flex-grow">{{ task.description || 'Tidak ada deskripsi tugas.' }}</p>
+
+        <div class="space-y-3 pt-4 border-t border-slate-700/50">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Project</span>
+            <span class="text-xs font-bold text-indigo-300">{{ task.project?.name || 'No Project' }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Assigned To</span>
+            <div class="flex items-center gap-2">
+              <div class="w-5 h-5 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-[10px] font-bold text-white overflow-hidden">
+                <span v-if="!task.user?.avatar">{{ task.user?.name?.charAt(0) }}</span>
+                <img v-else :src="task.user.avatar" class="w-full h-full object-cover">
+              </div>
+              <span class="text-xs font-bold text-slate-300">{{ task.user?.name || 'Unassigned' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="isEmployee && canEditTask(task)" class="mt-4 pt-4 border-t border-slate-700/30">
+          <select 
+            :value="task.status" 
+            @change="(e) => handleQuickUpdate(task, e.target.value)"
+            class="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-[11px] font-bold text-slate-300 focus:ring-1 focus:ring-indigo-500 outline-none"
+          >
+            <option value="todo">Update: To Do</option>
+            <option value="doing">Update: Doing</option>
+            <option value="review">Update: Review</option>
+            <option value="done">Update: Done</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="text-center py-20 bg-slate-800/10 border border-slate-700/50 rounded-3xl border-dashed">
+      <div class="bg-slate-800 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">📭</div>
+      <h3 class="text-lg font-bold text-white mb-1">Belum ada tugas</h3>
+      <p class="text-slate-500 text-sm max-w-xs mx-auto">Tugas yang Anda buat atau yang ditugaskan kepada Anda akan muncul di sini.</p>
+    </div>
+
+    <div v-if="showModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/80 backdrop-blur-md" @click="closeModal"></div>
+      <div class="relative bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl w-full max-w-lg p-8 transform transition-all animate-slide-up max-h-[95vh] overflow-y-auto custom-scrollbar">
+        <div class="flex justify-between items-center mb-8">
+          <h3 class="text-2xl font-black text-white italic tracking-tight">
+            {{ editingTask ? 'EDIT TASK' : 'NEW TASK' }}
+          </h3>
+          <button @click="closeModal" class="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-500 hover:text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        
+        <form @submit.prevent="saveTask" class="space-y-5">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Task Title</label>
+            <input v-model="formData.title" type="text" required placeholder="Nama tugas..." class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-600">
+          </div>
+          
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Description</label>
+            <textarea v-model="formData.description" rows="3" placeholder="Detail tugas..." class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-600"></textarea>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Priority</label>
+              <select v-model="formData.priority" class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 outline-none">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Status</label>
+              <select v-model="formData.status" class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 outline-none">
+                <option value="todo">To Do</option>
+                <option value="doing">Doing</option>
+                <option value="review">Review</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Project</label>
+              <select 
+                v-model="formData.project_id" 
+                @change="onProjectChange"
+                required 
+                class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+              >
+                <option value="" disabled>Pilih Project</option>
+                <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Deadline</label>
+              <input v-model="formData.due_date" type="date" class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Assign To (Project Members)</label>
+            <select 
+              v-model="formData.user_id" 
+              required 
+              :disabled="!formData.project_id"
+              class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="" disabled>
+                {{ formData.project_id ? 'Pilih Anggota Tim' : 'Pilih Proyek Terlebih Dahulu' }}
+              </option>
+              <option v-for="u in projectMembers" :key="u.id" :value="u.id">
+                {{ u.name }}
+              </option>
+            </select>
+            <p v-if="formData.project_id && projectMembers.length === 0" class="text-rose-400 text-[10px] mt-2 font-bold uppercase italic tracking-tighter">
+              ⚠️ Proyek ini belum memiliki anggota. Silakan tambah anggota di menu Proyek.
+            </p>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-8 pt-6 border-t border-slate-800">
+            <button type="button" @click="closeModal" class="px-6 py-2.5 text-xs font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors">Cancel</button>
+            <button 
+              type="submit" 
+              :disabled="formData.project_id && projectMembers.length === 0"
+              class="px-8 py-2.5 bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-700 disabled:text-slate-500 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-indigo-500/20 active:scale-95 uppercase tracking-widest"
+            >
+              {{ editingTask ? 'Update' : 'Save Task' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script setup>
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, reactive } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { taskService, projectService, userService } from '../services'
 
 const authStore = useAuthStore()
 const tasks = ref([])
 const projects = ref([])
-const users = ref([])
+const users = ref([]) // Cadangan jika diperlukan list semua user
 const loading = ref(false)
 const searchQuery = ref('')
 const showModal = ref(false)
 const editingTask = ref(null)
 const filterStatus = ref('')
 
-const formData = ref({
+const formData = reactive({
   title: '',
   description: '',
   priority: 'medium',
@@ -23,6 +248,7 @@ const formData = ref({
   due_date: ''
 })
 
+// Auth Computed
 const user = computed(() => authStore.user)
 const isAdmin = computed(() => user.value?.role_id === 1)
 const isManager = computed(() => user.value?.role_id === 2)
@@ -31,92 +257,83 @@ const canCreate = computed(() => isAdmin.value || isManager.value)
 const canDelete = computed(() => isAdmin.value || isManager.value)
 const canEditAll = computed(() => isAdmin.value || isManager.value)
 
+// --- LOGIKA FILTER MEMBER ---
+const projectMembers = computed(() => {
+  if (!formData.project_id) return []
+  // Cari proyek dari list projects yang sudah di-load
+  const selectedProject = projects.value.find(p => p.id === formData.project_id)
+  return selectedProject?.members || []
+})
+
+const onProjectChange = () => {
+  // Reset user_id jika project diganti, agar tidak terjadi salah penugasan
+  formData.user_id = ''
+}
+// ----------------------------
+
 const filteredTasks = computed(() => {
   let result = tasks.value.filter(task => 
     task.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
     task.description?.toLowerCase().includes(searchQuery.value.toLowerCase())
   )
-  
   if (filterStatus.value) {
     result = result.filter(t => t.status === filterStatus.value)
   }
-  
   return result
 })
 
 const getPriorityColor = (priority) => {
-  const colors = {
-    low: '#10b981',
-    medium: '#f59e0b',
-    high: '#ef4444',
-    urgent: '#7c3aed'
-  }
+  const colors = { low: '#10b981', medium: '#f59e0b', high: '#ef4444', urgent: '#7c3aed' }
   return colors[priority] || '#6b7280'
 }
 
 const getStatusColor = (status) => {
-  const colors = {
-    todo: '#6b7280',
-    doing: '#3b82f6',
-    review: '#f59e0b',
-    done: '#10b981'
-  }
+  const colors = { todo: '#94a3b8', doing: '#3b82f6', review: '#f59e0b', done: '#10b981' }
   return colors[status] || '#6b7280'
 }
 
 const getStatusLabel = (status) => {
-  const labels = {
-    todo: 'To Do',
-    doing: 'Doing',
-    review: 'Review',
-    done: 'Done'
-  }
+  const labels = { todo: 'To Do', doing: 'Doing', review: 'Review', done: 'Done' }
   return labels[status] || status
 }
 
-onMounted(async () => {
+const fetchAllData = async () => {
   loading.value = true
   try {
-    // Load tasks, projects, and users in parallel
-    const [tasksRes, projectsRes, usersRes] = await Promise.all([
+    // Note: Project service harus mengembalikan data beserta 'members'
+    const [tasksRes, projectsRes] = await Promise.all([
       taskService.getAllTasks(),
-      projectService.getAllProjects(),
-      userService.getAllUsers()
+      projectService.getAllProjects()
     ])
-    
     tasks.value = tasksRes.data.data || tasksRes.data || []
     projects.value = projectsRes.data.data || projectsRes.data || []
-    users.value = usersRes.data.data || usersRes.data || []
   } catch (error) {
-    console.error('Error loading data:', error)
+    console.error('Error loading tasks data:', error)
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(fetchAllData)
 
 const openModal = (task = null) => {
   if (task) {
     editingTask.value = task
-    formData.value = { 
+    Object.assign(formData, { 
       title: task.title,
       description: task.description,
       priority: task.priority,
       status: task.status,
       project_id: task.project_id,
       user_id: task.user_id,
-      due_date: task.due_date
-    }
+      due_date: task.due_date ? task.due_date.substring(0, 10) : ''
+    })
   } else {
     editingTask.value = null
-    formData.value = {
-      title: '',
-      description: '',
-      priority: 'medium',
-      status: 'todo',
-      project_id: '',
-      user_id: user.value?.id || '',
-      due_date: ''
-    }
+    Object.assign(formData, {
+      title: '', description: '', priority: 'medium', status: 'todo',
+      project_id: '', user_id: '', due_date: ''
+    })
   }
   showModal.value = true
 }
@@ -127,696 +344,60 @@ const closeModal = () => {
 }
 
 const saveTask = async () => {
-  if (!formData.value.title) {
-    alert('Title is required')
-    return
-  }
-
   try {
     if (editingTask.value) {
       if (isEmployee.value) {
-        // Employees can only update status
-        await taskService.updateTask(editingTask.value.id, { status: formData.value.status })
+        await taskService.updateTask(editingTask.value.id, { status: formData.status })
       } else {
-        await taskService.updateTask(editingTask.value.id, formData.value)
+        await taskService.updateTask(editingTask.value.id, { ...formData })
       }
     } else {
-      await taskService.createTask(formData.value)
+      await taskService.createTask({ ...formData })
     }
     closeModal()
-    // Reload tasks
-    const tasksRes = await taskService.getAllTasks()
-    tasks.value = tasksRes.data.data || tasksRes.data || []
+    await fetchAllData()
   } catch (error) {
-    alert('Error saving task: ' + (error.response?.data?.message || error.message))
+    alert('Action failed: ' + (error.response?.data?.message || error.message))
+  }
+}
+
+const handleQuickUpdate = async (task, newStatus) => {
+  try {
+    await taskService.updateTask(task.id, { status: newStatus })
+    task.status = newStatus // Update UI local
+  } catch (error) {
+    alert('Gagal update status')
   }
 }
 
 const deleteTask = async (id) => {
-  if (!confirm('Are you sure? This action cannot be undone.')) return
-  
+  if (!confirm('Hapus tugas ini secara permanen?')) return
   try {
     await taskService.deleteTask(id)
     tasks.value = tasks.value.filter(t => t.id !== id)
   } catch (error) {
-    alert('Error deleting task: ' + (error.response?.data?.message || error.message))
+    alert('Gagal menghapus tugas')
   }
 }
 
 const canEditTask = (task) => {
-  return canEditAll.value || (isEmployee.value && task.project?.members?.some(m => m.id === user.value?.id))
+  return canEditAll.value || (isEmployee.value && task.user_id === user.value?.id)
 }
 </script>
 
-<template>
-  <div class="tasks-container">
-    <!-- Header -->
-    <div class="tasks-header">
-      <div class="header-content">
-        <h1>📋 Tasks Management</h1>
-        <p class="subtitle">Manage and track your project tasks - Role: <strong>{{ user?.role?.name }}</strong></p>
-      </div>
-      <button v-if="canCreate" @click="openModal()" class="btn-create">✨ New Task</button>
-    </div>
-
-    <!-- Filters -->
-    <div class="filters-section">
-      <div class="search-box">
-        <input 
-          v-model="searchQuery" 
-          type="text" 
-          placeholder="🔍 Search tasks..." 
-          class="search-input" 
-        />
-      </div>
-      <div class="filter-box">
-        <select v-model="filterStatus" class="filter-select">
-          <option value="">All Status</option>
-          <option value="todo">To Do</option>
-          <option value="doing">Doing</option>
-          <option value="review">Review</option>
-          <option value="done">Done</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Tasks Grid -->
-    <div v-if="loading" class="loading-state">
-      <div class="spinner"></div>
-      <p>Loading tasks...</p>
-    </div>
-
-    <div v-else-if="filteredTasks.length === 0" class="empty-state">
-      <p>📭 No tasks found</p>
-      <p v-if="canCreate" class="text-muted">Click "New Task" to create your first task</p>
-    </div>
-
-    <div v-else class="tasks-grid">
-      <div v-for="task in filteredTasks" :key="task.id" class="task-card">
-        <!-- Top Bar -->
-        <div class="task-top">
-          <div class="badges">
-            <span class="priority-badge" :style="{ backgroundColor: getPriorityColor(task.priority) }">
-              {{ task.priority.toUpperCase() }}
-            </span>
-            <span class="status-badge" :style="{ backgroundColor: getStatusColor(task.status) }">
-              {{ getStatusLabel(task.status) }}
-            </span>
-          </div>
-          <div class="task-menu" v-if="canEditTask(task) || canDelete">
-            <button 
-              v-if="canEditTask(task)"
-              @click="openModal(task)" 
-              class="btn-icon" 
-              title="Edit"
-            >✎</button>
-            <button 
-              v-if="canDelete"
-              @click="deleteTask(task.id)" 
-              class="btn-icon btn-danger" 
-              title="Delete"
-            >✕</button>
-          </div>
-        </div>
-
-        <!-- Content -->
-        <h3 class="task-title">{{ task.title }}</h3>
-        <p class="task-description">{{ task.description || '—' }}</p>
-
-        <!-- Meta Info -->
-        <div class="task-meta">
-          <div class="meta-item">
-            <span class="meta-label">📁 Project:</span>
-            <span class="meta-value">{{ task.project?.name || 'N/A' }}</span>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">👤 Assigned:</span>
-            <span class="meta-value">{{ task.user?.name || 'N/A' }}</span>
-          </div>
-          <div v-if="task.due_date" class="meta-item">
-            <span class="meta-label">📅 Due:</span>
-            <span class="meta-value">{{ task.due_date }}</span>
-          </div>
-        </div>
-
-        <!-- Action Bar -->
-        <div v-if="isEmployee && canEditTask(task)" class="action-bar">
-          <select 
-            :value="task.status" 
-            @change="(e) => {
-              const newTask = { ...task, status: e.target.value };
-              openModal(newTask);
-            }"
-            class="status-select"
-          >
-            <option value="todo">To Do</option>
-            <option value="doing">Doing</option>
-            <option value="review">Review</option>
-            <option value="done">Done</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal -->
-    <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
-      <div class="modal-content">
-        <!-- Header -->
-        <div class="modal-header">
-          <h2>{{ editingTask ? '✎ Edit Task' : '✨ Create New Task' }}</h2>
-          <button @click="closeModal" class="btn-close">✕</button>
-        </div>
-
-        <!-- Form -->
-        <form @submit.prevent="saveTask" class="form">
-          <div class="form-group">
-            <label>Title *</label>
-            <input 
-              v-model="formData.title" 
-              type="text" 
-              placeholder="Task title" 
-              required 
-              class="input"
-            />
-          </div>
-
-          <div class="form-group">
-            <label>Description</label>
-            <textarea 
-              v-model="formData.description" 
-              placeholder="Task description (optional)" 
-              rows="3"
-              class="input"
-            ></textarea>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Priority</label>
-              <select v-model="formData.priority" class="input">
-                <option value="low">🟢 Low</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="high">🔴 High</option>
-                <option value="urgent">⚫ Urgent</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Status</label>
-              <select v-model="formData.status" class="input">
-                <option value="todo">To Do</option>
-                <option value="doing">Doing</option>
-                <option value="review">Review</option>
-                <option value="done">Done</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Due Date</label>
-              <input 
-                v-model="formData.due_date" 
-                type="date" 
-                class="input"
-              />
-            </div>
-            <div class="form-group">
-              <label>Project</label>
-              <select v-model="formData.project_id" class="input" required>
-                <option value="">Select project</option>
-                <option v-for="proj in projects" :key="proj.id" :value="proj.id">
-                  {{ proj.name }}
-                </option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Assign To</label>
-            <select v-model="formData.user_id" class="input" required>
-              <option value="">Select user</option>
-              <option v-for="usr in users" :key="usr.id" :value="usr.id">
-                {{ usr.name }} ({{ usr.role?.name }})
-              </option>
-            </select>
-          </div>
-
-          <div class="form-actions">
-            <button type="button" @click="closeModal" class="btn-cancel">Cancel</button>
-            <button type="submit" class="btn-submit">{{ editingTask ? 'Update Task' : 'Create Task' }}</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-</template>
-
 <style scoped>
-* {
-  box-sizing: border-box;
-}
+.animate-fade-in { animation: fadeIn 0.4s ease-out; }
+.animate-slide-up { animation: slideUp 0.3s ease-out; }
 
-.tasks-container {
-  padding: 2rem 0;
-  min-height: 100vh;
-}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-/* Header */
-.tasks-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
-  gap: 2rem;
-}
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-.header-content h1 {
-  margin: 0 0 0.5rem 0;
-  color: #1f2937;
-  font-size: 2rem;
-}
+.custom-scrollbar::-webkit-scrollbar { width: 5px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
 
-.subtitle {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.95rem;
-}
-
-.btn-create {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.95rem;
-  transition: all 0.3s;
-  white-space: nowrap;
-}
-
-.btn-create:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
-}
-
-/* Filters */
-.filters-section {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
-}
-
-.search-box {
-  flex: 1;
-  min-width: 200px;
-}
-
-.search-input {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  transition: all 0.3s;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.filter-select {
-  padding: 0.75rem 1rem;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.filter-select:focus {
-  outline: none;
-  border-color: #667eea;
-}
-
-/* Loading & Empty */
-.loading-state {
-  text-align: center;
-  padding: 4rem 2rem;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e5e7eb;
-  border-top-color: #667eea;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.empty-state {
-  text-align: center;
-  padding: 4rem 2rem;
-  background: white;
-  border-radius: 12px;
-  border: 2px dashed #e5e7eb;
-}
-
-.empty-state p {
-  margin: 0.5rem 0;
-  color: #6b7280;
-  font-size: 1rem;
-}
-
-.text-muted {
-  color: #9ca3af !important;
-  font-size: 0.9rem;
-}
-
-/* Grid */
-.tasks-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1.5rem;
-}
-
-.task-card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s;
-  display: flex;
-  flex-direction: column;
-}
-
-.task-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
-  border-color: #667eea;
-}
-
-.task-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  margin-bottom: 1.25rem;
-  gap: 1rem;
-}
-
-.badges {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.priority-badge,
-.status-badge {
-  display: inline-block;
-  padding: 0.35rem 0.7rem;
-  border-radius: 6px;
-  color: white;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.task-menu {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.btn-icon {
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-icon:hover {
-  background: #e5e7eb;
-  transform: scale(1.05);
-}
-
-.btn-icon.btn-danger:hover {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.task-title {
-  margin: 0 0 0.75rem 0;
-  color: #1f2937;
-  font-size: 1.1rem;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.task-description {
-  color: #6b7280;
-  margin: 0 0 1rem 0;
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-.task-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem 0;
-  border-top: 1px solid #f3f4f6;
-  border-bottom: 1px solid #f3f4f6;
-  margin-bottom: 1rem;
-  flex: 1;
-}
-
-.meta-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.85rem;
-}
-
-.meta-label {
-  color: #9ca3af;
-  font-weight: 500;
-}
-
-.meta-value {
-  color: #1f2937;
-  font-weight: 600;
-}
-
-.action-bar {
-  margin-top: auto;
-}
-
-.status-select {
-  width: 100%;
-  padding: 0.75rem;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  background: #f9fafb;
-  transition: all 0.3s;
-}
-
-.status-select:focus {
-  outline: none;
-  border-color: #667eea;
-  background: white;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-  animation: fadeIn 0.2s;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.modal-content {
-  background: white;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
-  animation: slideUp 0.3s;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
-  background: linear-gradient(135deg, #f8f9ff 0%, #f3f4f6 100%);
-}
-
-.modal-header h2 {
-  margin: 0;
-  color: #1f2937;
-  font-size: 1.25rem;
-}
-
-.btn-close {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: #9ca3af;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.3s;
-}
-
-.btn-close:hover {
-  color: #1f2937;
-}
-
-.form {
-  padding: 1.5rem;
-}
-
-.form-group {
-  margin-bottom: 1.5rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  color: #1f2937;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-family: inherit;
-  transition: all 0.3s;
-  background: #fff;
-}
-
-.input:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.form-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
-}
-
-.btn-cancel {
-  flex: 1;
-  padding: 0.75rem 1.5rem;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s;
-  color: #1f2937;
-}
-
-.btn-cancel:hover {
-  background: #e5e7eb;
-}
-
-.btn-submit {
-  flex: 1;
-  padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.btn-submit:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
-}
-
-@media (max-width: 768px) {
-  .tasks-header {
-    flex-direction: column;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-
-  .search-input,
-  .filter-select {
-    width: 100%;
-  }
-
-  .filters-section {
-    flex-direction: column;
-  }
-}
+input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.8); cursor: pointer; }
 </style>

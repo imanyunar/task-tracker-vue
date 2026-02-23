@@ -43,7 +43,7 @@ class UserController extends Controller
             'email'         => $request->email,
             'password'      => Hash::make($request->password), // Password WAJIB di-hash
             'department_id' => $request->department_id,
-            'role'          => 3,
+            'role_id'          => 3,
         ]);
 
         return response()->json([
