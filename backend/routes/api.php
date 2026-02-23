@@ -8,6 +8,9 @@ use App\Http\Controllers\API\DepartmentController;
 use App\Http\Controllers\API\ProjectController;
 use App\Http\Controllers\API\ProfileController;
 
+// ==========================================
+// PUBLIC ROUTES (Tidak perlu login)
+// ==========================================
 Route::get('/login', function () {
     return response()->file(public_path('login.html'));
 });
@@ -19,7 +22,15 @@ Route::get('/register', function () {
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+
+// ==========================================
+// PROTECTED ROUTES (Wajib login / memiliki token)
+// ==========================================
 Route::middleware('auth')->group(function () {
+    
+    // ------------------------------------------
+    // 1. RUTE HTML VIEWS
+    // ------------------------------------------
     Route::get('/dashboard', function () {
         return response()->file(public_path('dashboard.html'));
     });
@@ -35,17 +46,32 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile-view', function () { 
         return response()->file(public_path('profile.html')); 
     });
+
+    // ------------------------------------------
+    // 2. RUTE SPESIFIK (WAJIB DI ATAS RESOURCE!)
+    // ------------------------------------------
+    // Profile
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);
+    
+    // Dashboard Stats (KPI)
     Route::get('/dashboard-stats', [TaskController::class, 'getDashboardStats']);
+    
+    // Project Specific Actions
+    Route::get('/projects/search', [ProjectController::class, 'search']);
+    Route::post('/projects/{id}/members', [ProjectController::class, 'addMember']);
+    Route::get('/projects/{projectId}/tasks', [TaskController::class, 'tasksByProject']);
+    
+    // ------------------------------------------
+    // 3. RUTE RESOURCE (WAJIB DI BAWAH!)
+    // ------------------------------------------
     Route::apiResource('/departments', DepartmentController::class);
     Route::apiResource('/users', UserController::class);
     Route::apiResource('/projects', ProjectController::class);
-    Route::get('/projects/search', [ProjectController::class, 'search']);
-    Route::post('/projects/{id}/add-member', [ProjectController::class, 'addMember']);
-    Route::get('/projects/{projectId}/tasks', [TaskController::class, 'tasksByProject']);
-    
     Route::apiResource('/tasks', TaskController::class);
     
+    // ------------------------------------------
+    // 4. LOGOUT
+    // ------------------------------------------
     Route::post('/logout', [AuthController::class, 'logout']);
 });

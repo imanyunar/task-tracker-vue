@@ -3,52 +3,44 @@ import { AxiosResponse } from 'axios'
 
 // ==================== TYPE DEFINITIONS ====================
 
-interface AuthResponse {
+export interface AuthResponse {
   api_token: string
-  user: {
-    id: number
-    name: string
-    email: string
-    role_id: number
-    dept_id: number
-    role?: {
-      id: number
-      name: string
-    }
-    department?: {
-      id: number
-      name: string
-    }
-  }
+  user: User
 }
 
-interface Task {
+export interface Task {
   id: number
-  name: string
+  title: string         // Sesuai Laravel
   description: string
   project_id: number
   user_id: number
+  priority: string
   status: string
-  deadline: string
+  due_date: string      // Sesuai Laravel
   created_at: string
   updated_at: string
+  user?: User
+  project?: Project
 }
 
-interface Project {
+export interface Project {
   id: number
   name: string
   description: string
+  start_date: string; // Tambahkan ini
+  end_date: string;   // Tambahkan ini
   created_by: number
   created_at: string
   updated_at: string
+  members?: User[]
 }
 
-interface User {
+export interface User {
   id: number
   name: string
   email: string
   role_id: number
-  dept_id: number
+  department_id: number // Konsisten menggunakan department_id
   role?: {
     id: number
     name: string
@@ -59,12 +51,7 @@ interface User {
   }
 }
 
-interface Department {
-  id: number
-  name: string
-}
-
-interface DashboardStats {
+export interface DashboardStats {
   total_tasks: number
   completed_tasks: number
   pending_tasks: number
@@ -74,52 +61,31 @@ interface DashboardStats {
   kpi_score: number
 }
 
-interface PaginatedResponse<T> {
-  data: T[]
-  meta?: {
-    current_page: number
-    total: number
-    per_page: number
-  }
-}
-
 // ==================== AUTH SERVICE ====================
 
 export const authService = {
-  register(userData: {
-    name: string
-    email: string
-    password: string
-    password_confirmation: string
-    department?: string | number
-  }): Promise<AxiosResponse<AuthResponse>> {
-    return api.post('/register', userData)
+  login(credentials: { email: string; password: string }): Promise<AxiosResponse<AuthResponse>> {
+    return api.post('/login', credentials)
   },
 
-  login(credentials: {
-    email: string
-    password: string
-  }): Promise<AxiosResponse<AuthResponse>> {
-    return api.post('/login', credentials)
+  register(userData: any): Promise<AxiosResponse<AuthResponse>> {
+    return api.post('/register', userData)
   },
 
   logout(): Promise<AxiosResponse> {
     return api.post('/logout')
-  },
-
-  getUserProfile(): Promise<AxiosResponse<{ user: User }>> {
-    return api.get('/user-profile')
   },
 }
 
 // ==================== PROFILE SERVICE ====================
 
 export const profileService = {
-  getProfile(): Promise<AxiosResponse<{ user: User }>> {
-    return api.get('/profile')
+  getProfile(): Promise<AxiosResponse<{ data: User }>> {
+    return api.get('/profile') // Menggunakan /profile agar tidak 404 saat refresh
   },
-  updateProfile(data: Partial<User>): Promise<AxiosResponse<{ data: User }>> {
-    return api.put('/profile', data)
+
+  updateProfile(profileData: Partial<User>): Promise<AxiosResponse<{ data: User }>> {
+    return api.put('/profile', profileData)
   },
 }
 
@@ -147,38 +113,23 @@ export const taskService = {
   },
 
   getDashboardStats(): Promise<AxiosResponse<{ data: DashboardStats }>> {
-    return api.get('/dashboard-stats')
-  },
-
-  getKPIStats(): Promise<AxiosResponse<{ data: DashboardStats }>> {
-    return api.get('/kpi-stats')
+    return api.get('/dashboard-stats') 
   },
 }
 
 // ==================== PROJECT SERVICE ====================
 
 export const projectService = {
-  getAllProjects(page = 1): Promise<AxiosResponse<PaginatedResponse<Project>>> {
+  getAllProjects(page: number = 1): Promise<AxiosResponse> {
     return api.get(`/projects?page=${page}`)
-  },
-
-  createProject(projectData: Partial<Project>): Promise<AxiosResponse<{ data: Project }>> {
-    return api.post('/projects', projectData)
-  },
-
-  searchProjects(query: string): Promise<AxiosResponse<{ data: Project[] }>> {
-    return api.get('/projects/search', { params: { q: query } })
-  },
-
-  addMember(
-    projectId: number,
-    memberData: { user_id: number; role: string }
-  ): Promise<AxiosResponse> {
-    return api.post(`/projects/${projectId}/add-member`, memberData)
   },
 
   getProjectById(id: number): Promise<AxiosResponse<{ data: Project }>> {
     return api.get(`/projects/${id}`)
+  },
+
+  createProject(projectData: Partial<Project>): Promise<AxiosResponse<{ data: Project }>> {
+    return api.post('/projects', projectData)
   },
 
   updateProject(id: number, projectData: Partial<Project>): Promise<AxiosResponse<{ data: Project }>> {
@@ -188,52 +139,18 @@ export const projectService = {
   deleteProject(id: number): Promise<AxiosResponse> {
     return api.delete(`/projects/${id}`)
   },
+  
+  addMember(projectId: number, payload: { user_id: number, role: string }): Promise<AxiosResponse> {
+    return api.post(`/projects/${projectId}/members`, payload)
+  }
 }
 
-// ==================== USER SERVICE ====================
+// ==================== USER & DEPT SERVICE ====================
 
 export const userService = {
-  getAllUsers(): Promise<AxiosResponse<{ data: User[] }>> {
-    return api.get('/users')
-  },
-
-  getUserById(id: number): Promise<AxiosResponse<{ data: User }>> {
-    return api.get(`/users/${id}`)
-  },
-
-  updateUser(id: number, userData: Partial<User>): Promise<AxiosResponse<{ data: User }>> {
-    return api.put(`/users/${id}`, userData)
-  },
-
-  deleteUser(id: number): Promise<AxiosResponse> {
-    return api.delete(`/users/${id}`)
-  },
+  getAllUsers(): Promise<AxiosResponse<{ data: User[] }>> { return api.get('/users') }
 }
-
-// ==================== DEPARTMENT SERVICE ====================
 
 export const departmentService = {
-  getAllDepartments(): Promise<AxiosResponse<{ data: Department[] }>> {
-    return api.get('/departments')
-  },
-
-  getDepartmentById(id: number): Promise<AxiosResponse<{ data: Department }>> {
-    return api.get(`/departments/${id}`)
-  },
-
-  createDepartment(
-    deptData: Partial<Department>
-  ): Promise<AxiosResponse<{ data: Department }>> {
-    return api.post('/departments', deptData)
-  },
-}
-
-// Export default untuk mempermudah import sekaligus
-export default {
-  authService,
-  profileService,
-  taskService,
-  projectService,
-  userService,
-  departmentService,
+  getAllDepartments(): Promise<AxiosResponse<{ data: any[] }>> { return api.get('/departments') }
 }

@@ -17,11 +17,10 @@ const apiClient: AxiosInstance = axios.create({
  */
 apiClient.interceptors.request.use(
   (config) => {
-    // Nama key harus sesuai dengan yang Anda simpan saat login
     const token = localStorage.getItem('api_token')
 
     if (token) {
-      // Menggunakan format Bearer Token sesuai standar API
+      // Menggunakan format Bearer Token
       config.headers.Authorization = `Bearer ${token}`
     }
     return config
@@ -32,16 +31,16 @@ apiClient.interceptors.request.use(
 )
 
 /**
- * Response Interceptor (Opsional tapi sangat disarankan)
+ * Response Interceptor
  * Tugas: Menangani error global, seperti token kadaluarsa (401).
  */
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Jika backend mengirim 401 (Unauthorized), arahkan user ke login
+    // Jika backend mengirim 401 (Unauthorized), hapus token dan arahkan ke login
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('api_token')
-      // window.location.href = '/login';
+      window.location.href = '/login'
     }
     return Promise.reject(error)
   }

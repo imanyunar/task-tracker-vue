@@ -24,54 +24,120 @@ interface AuthState {
 }
 
 export const useAuthStore = defineStore('auth', {
-  state: (): AuthState => ({
-    user: null,
-    token: localStorage.getItem('api_token') || null,
-  }),
+  state: (): AuthState => {
+    // 1. Coba ambil data user dari localStorage saat aplikasi pertama dimuat/direfresh
+    let storedUser = null
+    try {
+      const userStr = localStorage.getItem('user_data')
+      if (userStr) {
+        storedUser = JSON.parse(userStr)
+      }
+    } catch (e) {
+      console.error('Gagal membaca data user dari localStorage', e)
+    }
+
+    return {
+      user: storedUser,
+      token: localStorage.getItem('api_token') || null,
+    }
+  },
+  
   getters: {
     isLoggedIn: (state) => !!state.token,
     isAuthenticated: (state) => !!state.token,
     isUserDataComplete: (state) =>
-      state.user && state.user.role && state.user.department,
+      !!(state.user && state.user.role && state.user.department),
   },
+  
   actions: {
     async register(userData: {
       name: string
       email: string
       password: string
       password_confirmation: string
-      department?: string | number
+      department: string | number
     }) {
       const res = await authService.register(userData)
-      this.token = res.data.api_token
-      this.user = res.data.user
-      localStorage.setItem('api_token', this.token)
-      return res.data
+      const responseData = res.data as any
+      
+      this.token = responseData.api_token
+      this.user = responseData.user
+      
+      // 2. Simpan token dan data user ke localStorage
+      if (this.token) {
+        localStorage.setItem('api_token', this.token)
+        localStorage.setItem('user_data', JSON.stringify(this.user))
+      }
+      return responseData
     },
+
     async login(credentials: { email: string; password: string }) {
       const res = await authService.login(credentials)
-      this.token = res.data.api_token
-      this.user = res.data.user
-      localStorage.setItem('api_token', this.token)
-      return res.data
+      const responseData = res.data as any
+      
+      this.token = responseData.api_token
+      this.user = responseData.user
+      
+      // 3. Simpan token dan data user ke localStorage
+      if (this.token) {
+        localStorage.setItem('api_token', this.token)
+        localStorage.setItem('user_data', JSON.stringify(this.user))
+      }
+      return responseData
     },
+
     async fetchProfile() {
-      const res = await profileService.getProfile()
-      this.user = res.data.user
+      try {
+        const res = await profileService.getProfile()
+        
+        const responseData = res.data as any
+        const userData = responseData.data || responseData.user || responseData
+        
+        this.user = userData as User
+        
+        // Update user data di localStorage agar selalu sinkron
+        localStorage.setItem('user_data', JSON.stringify(this.user))
+        
+        return userData
+      } catch (error) {
+        console.error('Gagal mengambil data profil:', error)
+        this.logout() 
+        throw error
+      }
     },
+
     async refreshUserData() {
       try {
         const res = await profileService.getProfile()
-        this.user = res.data.user
+        
+        const responseData = res.data as any
+        const userData = responseData.data || responseData.user || responseData
+        
+        this.user = userData as User
+        localStorage.setItem('user_data', JSON.stringify(this.user))
+        
+        return userData
       } catch (error) {
-        console.error('Failed to refresh user data:', error)
+        console.error('Gagal memuat ulang data profil:', error)
+        throw error
       }
     },
-    logout() {
-      authService.logout()
-      this.token = null
-      this.user = null
-      localStorage.removeItem('api_token')
-    },
-  },
+
+    async logout() {
+      try {
+        // Uncomment baris di bawah jika API backend Anda sudah siap menangani logout token
+        // await authService.logout()
+      } catch (error) {
+        console.error('Gagal logout di server:', error)
+      } finally {
+        // 4. Bersihkan State Pinia
+        this.user = null
+        this.token = null
+        
+        // 5. Bersihkan semua jejak dari memori browser
+        localStorage.removeItem('api_token')
+        localStorage.removeItem('user_data') // WAJIB DIHAPUS SAAT LOGOUT
+      }
+    }
+  }
 })
