@@ -19,28 +19,32 @@ class ProjectController extends Controller
     public function index(Request $request) {
         $user = $request->user();
         
-        $query = Project::with('members')->withCount([
+        $query = Project::with(['department', 'members'])->withCount([
             'tasks', 
             'tasks as completed_tasks_count' => function ($q) {
                 $q->where('status', 'done');
             }
         ]);
 
-        // Role 3 Global (Employee) hanya lihat project yang mereka ikuti
-        if ((int)$user->role_id === 3) {
-            $query->whereHas('members', function($q) use ($user) {
-                $q->where('user_id', $user->id);
+        /** * FIX LOGIKA: 
+         * Admin (1) -> Lihat semua.
+         * Manager (2) & Employee (3) -> Lihat proyek departemennya ATAU yang mereka ikuti.
+         */
+        if ((int)$user->role_id !== 1) {
+            $query->where(function($q) use ($user) {
+                 $q->where('department_id', $user->department_id) 
+                   ->orWhereHas('members', function($sq) use ($user) {
+                        $sq->where('user_id', $user->id);
+                   });
             });
-        }
+        } // <--- Tadi kamu menutup kurung di sini, itu salah.
 
-        $projects = $query->get();
+        $projects = $query->get(); // <--- Sekarang variabel ini aman di dalam fungsi.
 
         $projects->transform(function ($project) use ($user) {
-            // Inject Role ID Project ke tiap project agar Frontend tahu aksesnya
             $member = $project->members->where('id', $user->id)->first();
             $project->my_role_id = $member ? $member->pivot->role_in_project : null;
 
-            // Hitung Progress
             $total = $project->tasks_count;
             $completed = $project->completed_tasks_count;
             $project->progress = $total > 0 ? round(($completed / $total) * 100, 2) : 0;
@@ -49,62 +53,74 @@ class ProjectController extends Controller
 
         return response()->json($projects);
     }
-    public function store(Request $request) {
+    public function store(Request $request)
+{
     $user = $request->user();
 
-    // Hanya Global Admin (1) atau Global Manager (2) yang bisa buat proyek
-    if (!$user || (int)$user->role_id === 3) { 
-        return response()->json(['success' => false, 'message' => 'Anda tidak memiliki izin global untuk membuat proyek'], 403);
-    }
-
-    $validator = Validator::make($request->all(), [
-        'name'       => 'required|string|max:255',
-        'start_date' => 'required|date',
-        'end_date'   => 'required|date|after:start_date',
+    // 1. Validasi dasar
+    $validated = $request->validate([
+        'name'          => 'required|string|max:255',
+        'description'   => 'nullable|string',
+        'start_date'    => 'required|date',
+        'end_date'      => 'required|date|after_or_equal:start_date',
+        'status'        => 'required|in:planned,on_progress,completed',
+        // Jika admin, department_id wajib dikirim dari frontend. 
+        // Jika manager, department_id tidak wajib dikirim karena akan diambil dari profilnya.
+        'department_id' => $user->role_id == 1 ? 'required|exists:departments,id' : 'nullable',
     ]);
 
-    if ($validator->fails()) {
-        return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+    // 2. Logika Penentuan Department
+    if ($user->role_id == 1) {
+        // Jika Admin: Gunakan ID departemen yang dipilih di form
+        $deptId = $request->department_id;
+    } else {
+        // Jika Manager: Paksa menggunakan ID departemen tempat dia bekerja
+        $deptId = $user->department_id;
     }
 
-    // 1. Simpan data proyek
-    $project = Project::create($request->all());
-
-    // 2. AUTO-SET OWNER: User yang membuat otomatis jadi Owner di project ini
-    $project->members()->attach($user->id, [
-        'role_in_project' => Project::OWNER // ID 1
+    // 3. Simpan Proyek
+    $project = Project::create([
+        'name'          => $request->name,
+        'description'   => $request->description,
+        'start_date'    => $request->start_date,
+        'end_date'      => $request->end_date,
+        'status'        => $request->status,
+        'department_id' => $deptId,
     ]);
+
+    // 4. Otomatis jadikan si pembuat sebagai 'OWNER' di tabel pivot
+    $project->members()->attach($user->id, ['role_in_project' => Project::OWNER]);
 
     return response()->json([
-        'success' => true,
-        'message' => 'Proyek berhasil dibuat. Anda otomatis menjadi Owner.',
-        'data' => $project->load('members')
+        'message' => 'Project created successfully',
+        'data'    => $project->load('department')
     ], 201);
 }
 
     /**
      * Display the specified project
      */
-    public function show(Request $request, $id)
-{
-    $user = $request->user();
-    $project = Project::with(['members', 'tasks'])->find($id);
+    public function show(Request $request, $id) {
+        $user = $request->user();
+        $project = Project::with(['members', 'tasks', 'department'])->find($id);
 
-    if (!$project) {
-        return response()->json(['success' => false, 'message' => 'Project tidak ditemukan'], 404);
+        if (!$project) {
+            return response()->json(['success' => false, 'message' => 'Project tidak ditemukan'], 404);
+        }
+
+        $isMember = $project->members->contains('id', $user->id);
+        $isSameDept = (int)$project->department_id === (int)$user->department_id;
+
+        // Tolak akses jika: Bukan Admin DAN Bukan Member DAN Bukan satu departemen
+        if ((int)$user->role_id !== 1 && !$isMember && !$isSameDept) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak'], 403);
+        }
+
+        $member = $project->members->where('id', $user->id)->first();
+        $project->my_role_id = $member ? $member->pivot->role_in_project : null;
+
+        return response()->json(['success' => true, 'data' => $project], 200);
     }
-
-    // Cek keanggotaan untuk Role 3
-    $member = $project->members->where('id', $user->id)->first();
-    if ((int)$user->role_id === 3 && !$member) {
-        return response()->json(['success' => false, 'message' => 'Anda bukan anggota tim'], 403);
-    }
-
-    // Inject role info
-    $project->my_role_id = $member ? $member->pivot->role_in_project : null;
-
-    return response()->json(['success' => true, 'data' => $project], 200);
-}
 
     /**
      * Update the specified project
@@ -147,8 +163,7 @@ class ProjectController extends Controller
     /**
      * Search projects
      */
-    public function search(Request $request)
-    {
+    public function search(Request $request) {
         $user = $request->user();
         $katakunci = $request->input('search', '');
         
@@ -157,9 +172,13 @@ class ProjectController extends Controller
               ->orWhere('description', 'ILIKE', "%$katakunci%");
         });
         
-        if ($user->role_id == 3) {
-            $query->whereHas('members', function($q) use ($user) {
-                $q->where('user_id', $user->id);
+        // Samakan filter pencarian dengan filter index (untuk Role 2 & 3)
+        if ((int)$user->role_id !== 1) {
+            $query->where(function($q) use ($user) {
+                $q->where('department_id', $user->department_id)
+                  ->orWhereHas('members', function($sq) use ($user) {
+                      $sq->where('user_id', $user->id);
+                  });
             });
         }
         

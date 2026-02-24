@@ -19,7 +19,10 @@ const staticDepartments = [
   { id: 1, name: 'IT Support' },
   { id: 2, name: 'Human Resource' },
   { id: 3, name: 'Marketing' },
-  { id: 4, name: 'Finance' },
+  { id: 5, name: 'Finance' },
+  { id: 6, name: 'RnD' },
+
+  
 
 ]
 
