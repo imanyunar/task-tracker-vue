@@ -17,23 +17,67 @@
 
 <script setup>
 import { onMounted } from 'vue'
-import { useAuthStore } from './stores/auth' // Pastikan file auth.ts ada di src/stores/
-import Navbar from './components/Navbar.vue' // Pastikan file Navbar.vue ada di src/components/
+import { useRouter } from 'vue-router'
+import { useAuthStore } from './stores/auth' // Mengimpor store dari auth.ts
+import Navbar from './components/Navbar.vue' 
 
 const authStore = useAuthStore()
+const router = useRouter()
 
-onMounted(() => {
-  const token = localStorage.getItem('api_token')
-  // Cek jika token ada dan valid sebelum fetch profile otomatis
+/**
+ * Validasi Sesi Manual saat Aplikasi Dimuat
+ * Karena SESSION_DRIVER di Laravel menggunakan Redis, data sesi bisa hilang jika server restart.
+ */
+onMounted(async () => {
+  // Mengambil token dari localStorage atau store
+  const token = localStorage.getItem('api_token') || authStore.token
+
+  // Cek jika token ada sebelum melakukan validasi ke backend
   if (token && token !== 'undefined' && token !== 'null' && token.length > 0) {
-    authStore.fetchProfile().catch((err) => {
-      console.warn('Gagal memuat profil otomatis:', err.message)
-    })
+    try {
+      /**
+       * Memanggil profileService.getProfile() melalui action di Pinia.
+       * Jika Redis masih menyimpan sesi ini, data user akan diperbarui.
+       */
+      // Menggunakan Promise.race untuk menambahkan timeout
+      // Jika server tidak merespons dalam 5 detik, anggap server offline
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Server timeout')), 5000)
+      )
+      
+      await Promise.race([
+        authStore.fetchProfile(),
+        timeoutPromise
+      ]) 
+    } catch (err) {
+      /**
+       * Jika fetchProfile gagal (Error 401 Unauthorized atau Server Mati):
+       * 1. Action logout() di auth.ts akan dipanggil secara otomatis oleh blok catch di sana.
+       * 2. Menghapus api_token dan user_data dari localStorage.
+       * 3. Mengarahkan user kembali ke halaman login.
+       */
+      console.warn('Sesi tidak valid di Redis atau server offline. Logout otomatis...', err.message)
+      
+      //强制清除本地存储
+      localStorage.removeItem('api_token')
+      localStorage.removeItem('user_data')
+      authStore.user = null
+      authStore.token = null
+      
+      router.push('/login')
+    }
+  } else {
+    /**
+     * Jika tidak ada token sama sekali saat aplikasi dimuat, 
+     * pastikan state Pinia benar-benar bersih.
+     */
+    authStore.logout()
   }
 })
 </script>
 
 <style>
+/* Font dan Global Style */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
@@ -55,7 +99,7 @@ body {
   overflow-x: hidden;
 }
 
-/* Page Slide Transition */
+/* Page Slide Transition - Transisi antar halaman router */
 .page-slide-enter-active, 
 .page-slide-leave-active {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);

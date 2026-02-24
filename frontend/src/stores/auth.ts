@@ -25,20 +25,20 @@ interface AuthState {
 
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => {
-    // 1. Coba ambil data user dari localStorage saat aplikasi pertama dimuat/direfresh
+    // Membaca data awal dari sessionStorage
     let storedUser = null
     try {
-      const userStr = localStorage.getItem('user_data')
+      const userStr = sessionStorage.getItem('user_data')
       if (userStr) {
         storedUser = JSON.parse(userStr)
       }
     } catch (e) {
-      console.error('Gagal membaca data user dari localStorage', e)
+      console.error('Gagal membaca data user dari sessionStorage', e)
     }
 
     return {
       user: storedUser,
-      token: localStorage.getItem('api_token') || null,
+      token: sessionStorage.getItem('api_token') || null,
     }
   },
   
@@ -50,107 +50,86 @@ export const useAuthStore = defineStore('auth', {
   },
   
   actions: {
-    async register(userData: {
-      name: string
-      email: string
-      password: string
-      password_confirmation: string
-      department: string | number
-    }) {
+    async register(userData: any) {
       const res = await authService.register(userData)
       const responseData = res.data as any
       
       this.token = responseData.api_token
       this.user = responseData.user
       
-      // 2. Simpan token dan data user ke localStorage
       if (this.token) {
-        localStorage.setItem('api_token', this.token)
-        localStorage.setItem('user_data', JSON.stringify(this.user))
+        sessionStorage.setItem('api_token', this.token)
+        sessionStorage.setItem('user_data', JSON.stringify(this.user))
       }
       return responseData
     },
 
     async login(credentials: { email: string; password: string }) {
-  try {
-    const res = await authService.login(credentials)
-    const responseData = res.data as any
-    
-    // AMBIL TOKEN (Cek beberapa kemungkinan nama key dari backend)
-    const token = responseData.api_token || responseData.token || responseData.access_token
-    const user = responseData.user || responseData.data
-    
-    if (!token) {
-       console.error("Token tidak ditemukan di response API. Periksa struktur JSON Backend kamu.")
-       return false
-    }
+      try {
+        const res = await authService.login(credentials)
+        const responseData = res.data as any
+        
+        const token = responseData.api_token || responseData.token || responseData.access_token
+        const user = responseData.user || responseData.data
+        
+        if (!token) {
+           console.error("Token tidak ditemukan. Periksa struktur API Backend.")
+           return false
+        }
 
-    // 1. Update State Pinia (PENTING: Harus sebelum return)
-    this.token = token
-    this.user = user
-    
-    // 2. Simpan ke localStorage
-    localStorage.setItem('api_token', token)
-    localStorage.setItem('user_data', JSON.stringify(user))
-    
-    return true // Mengembalikan TRUE agar Login.vue tahu ini berhasil
-  } catch (error) {
-    console.error("Login Store Error:", error)
-    throw error
-  }
-},
+        this.token = token
+        this.user = user
+        
+        sessionStorage.setItem('api_token', token)
+        sessionStorage.setItem('user_data', JSON.stringify(user))
+        
+        return true
+      } catch (error) {
+        console.error("Login Store Error:", error)
+        throw error
+      }
+    },
 
+    /**
+     * PENTING: Gunakan ini di App.vue atau Router Guard 
+     * untuk memastikan token masih ada di DB.
+     */
     async fetchProfile() {
       try {
         const res = await profileService.getProfile()
-        
         const responseData = res.data as any
         const userData = responseData.data || responseData.user || responseData
         
         this.user = userData as User
-        
-        // Update user data di localStorage agar selalu sinkron
-        localStorage.setItem('user_data', JSON.stringify(this.user))
-        
+        sessionStorage.setItem('user_data', JSON.stringify(this.user))
         return userData
-      } catch (error) {
-        console.error('Gagal mengambil data profil:', error)
+      } catch (error: any) {
+        // Jika token tidak valid atau server offline,
+        // paksa logout dan bersihkan sessionStorage
+        console.error('Token tidak valid atau server offline:', error)
         this.logout() 
         throw error
       }
     },
 
     async refreshUserData() {
-      try {
-        const res = await profileService.getProfile()
-        
-        const responseData = res.data as any
-        const userData = responseData.data || responseData.user || responseData
-        
-        this.user = userData as User
-        localStorage.setItem('user_data', JSON.stringify(this.user))
-        
-        return userData
-      } catch (error) {
-        console.error('Gagal memuat ulang data profil:', error)
-        throw error
-      }
+      return this.fetchProfile() // Re-use fungsi fetchProfile agar konsisten
     },
 
     async logout() {
       try {
-        // Uncomment baris di bawah jika API backend Anda sudah siap menangani logout token
-        // await authService.logout()
+        // Panggil API Logout agar token di Database dihapus secara permanen
+        await authService.logout()
       } catch (error) {
-        console.error('Gagal logout di server:', error)
+        console.warn('Gagal menghapus sesi di server (mungkin server mati), membersihkan lokal saja.')
       } finally {
-        // 4. Bersihkan State Pinia
+        // Bersihkan State
         this.user = null
         this.token = null
         
-        // 5. Bersihkan semua jejak dari memori browser
-        localStorage.removeItem('api_token')
-        localStorage.removeItem('user_data') // WAJIB DIHAPUS SAAT LOGOUT
+        // Bersihkan Browser Storage
+        sessionStorage.removeItem('api_token')
+        sessionStorage.removeItem('user_data')
       }
     }
   }

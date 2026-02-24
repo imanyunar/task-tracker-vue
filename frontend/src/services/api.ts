@@ -12,15 +12,15 @@ const apiClient: AxiosInstance = axios.create({
 
 /**
  * Request Interceptor
- * Tugas: Mengambil 'api_token' dari localStorage dan
+ * Tugas: Mengambil 'api_token' dari sessionStorage dan
  * menyisipkannya ke header 'Authorization' sebelum request dikirim.
  */
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('api_token')
+    const token = sessionStorage.getItem('api_token')
 
     if (token) {
-      // Menggunakan format Bearer Token
+      // Menggunakan format Bearer Token secara manual
       config.headers.Authorization = `Bearer ${token}`
     }
     return config
@@ -30,20 +30,6 @@ apiClient.interceptors.request.use(
   }
 )
 
-/**
- * Response Interceptor
- * Tugas: Menangani error global, seperti token kadaluarsa (401).
- */
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // Jika backend mengirim 401 (Unauthorized), hapus token dan arahkan ke login
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('api_token')
-      window.location.href = '/login'
-    }
-    return Promise.reject(error)
-  }
-)
+// Response interceptor dihapus agar pengecekan dilakukan secara manual di komponen
 
 export default apiClient
