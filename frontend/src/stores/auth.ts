@@ -72,19 +72,33 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async login(credentials: { email: string; password: string }) {
-      const res = await authService.login(credentials)
-      const responseData = res.data as any
-      
-      this.token = responseData.api_token
-      this.user = responseData.user
-      
-      // 3. Simpan token dan data user ke localStorage
-      if (this.token) {
-        localStorage.setItem('api_token', this.token)
-        localStorage.setItem('user_data', JSON.stringify(this.user))
-      }
-      return responseData
-    },
+  try {
+    const res = await authService.login(credentials)
+    const responseData = res.data as any
+    
+    // AMBIL TOKEN (Cek beberapa kemungkinan nama key dari backend)
+    const token = responseData.api_token || responseData.token || responseData.access_token
+    const user = responseData.user || responseData.data
+    
+    if (!token) {
+       console.error("Token tidak ditemukan di response API. Periksa struktur JSON Backend kamu.")
+       return false
+    }
+
+    // 1. Update State Pinia (PENTING: Harus sebelum return)
+    this.token = token
+    this.user = user
+    
+    // 2. Simpan ke localStorage
+    localStorage.setItem('api_token', token)
+    localStorage.setItem('user_data', JSON.stringify(user))
+    
+    return true // Mengembalikan TRUE agar Login.vue tahu ini berhasil
+  } catch (error) {
+    console.error("Login Store Error:", error)
+    throw error
+  }
+},
 
     async fetchProfile() {
       try {

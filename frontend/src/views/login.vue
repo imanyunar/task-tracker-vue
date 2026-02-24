@@ -19,26 +19,21 @@ const showNotify = (msg, type = 'error') => {
 }
 
 const handleLogin = async () => {
-  if (!email.value || !password.value) {
-    showNotify('Mohon isi email dan password Anda', 'error')
-    return
-  }
-
   loading.value = true
-
   try {
-    await authStore.login({
+    // Tunggu hasil return true dari store
+    const isSuccess = await authStore.login({
       email: email.value,
       password: password.value
     })
     
-    showNotify('Login berhasil! Selamat datang kembali.', 'success')
-    
-    setTimeout(() => {
-      router.push('/dashboard')
-    }, 1500)
+    if (isSuccess) {
+      showNotify('Login berhasil!', 'success')
+      // Gunakan replace agar tidak bisa back ke login
+      router.replace({ name: 'Dashboard' }) 
+    }
   } catch (err) {
-    showNotify(authStore.error || 'Login gagal, periksa kembali akun Anda', 'error')
+    showNotify('Email atau password salah', 'error')
   } finally {
     loading.value = false
   }

@@ -1,11 +1,14 @@
 import { ref, Ref, computed } from 'vue'
 import { projectService } from '../services'
 
-interface Project {
+// PERUBAHAN 1: Update Interface Project agar mendukung sistem Role
+export interface Project {
   id: number
   name: string
   description: string
-  progress?: number
+  progress: number      // Sekarang wajib karena dikirim dari backend
+  my_role_id: number    // DATA KRUSIAL: Menentukan hak akses user di proyek ini
+  status: string        // Tambahkan status
   start_date?: string
   end_date?: string
   created_by: number
@@ -40,7 +43,6 @@ export const useProjects = (): UseProjectsReturn => {
   const loading = ref(false)
   const error = ref('')
 
-  // Computed untuk mengecek apakah masih ada data yang bisa dimuat
   const hasMore = computed(() => {
     if (!pagination.value) return false
     return pagination.value.current_page < pagination.value.last_page
@@ -53,18 +55,14 @@ export const useProjects = (): UseProjectsReturn => {
       const response = await projectService.getAllProjects(page)
       const rawData = response.data as any
       
-      // Laravel mengembalikan data dalam properti 'data'
       const dataItems = rawData.data || []
       
       if (page === 1) {
-        // Jika memuat halaman pertama (atau refresh), ganti total data
         projects.value = dataItems
       } else {
-        // Jika memuat halaman berikutnya, GABUNGKAN data lama dengan yang baru
         projects.value = [...projects.value, ...dataItems]
       }
 
-      // Simpan informasi paginasi dari backend
       pagination.value = {
         current_page: rawData.current_page,
         last_page: rawData.last_page,
@@ -90,7 +88,7 @@ export const useProjects = (): UseProjectsReturn => {
       const response = await projectService.createProject(projectData)
       const data = (response.data as any).data || response.data
       
-      // Masukkan project baru ke barisan paling atas agar langsung terlihat
+      // PERUBAHAN 2: Unshift agar proyek baru muncul paling atas dengan role Owner
       projects.value.unshift(data)
       return data
     } catch (err: any) {
@@ -106,7 +104,8 @@ export const useProjects = (): UseProjectsReturn => {
       
       const index = projects.value.findIndex((p) => p.id === id)
       if (index !== -1) {
-        projects.value[index] = data
+        // PERUBAHAN 3: Memastikan my_role_id tetap ada saat data diupdate
+        projects.value[index] = { ...projects.value[index], ...data }
       }
       return data
     } catch (err: any) {
@@ -118,7 +117,6 @@ export const useProjects = (): UseProjectsReturn => {
   const deleteProject = async (id: number) => {
     try {
       await projectService.deleteProject(id)
-      // Hapus item dari state lokal agar UI langsung update tanpa refresh
       projects.value = projects.value.filter((p) => p.id !== id)
     } catch (err: any) {
       error.value = err.response?.data?.message || 'Gagal hapus project'
@@ -140,7 +138,6 @@ export const useProjects = (): UseProjectsReturn => {
     try {
       const response = await projectService.searchProjects(query)
       const data = (response.data as any).data || response.data
-      // Untuk hasil pencarian, kita biasanya mereset list
       projects.value = Array.isArray(data) ? data : []
       return data
     } catch (err: any) {

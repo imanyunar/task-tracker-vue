@@ -4,19 +4,19 @@ import { useAuthStore } from '../stores/auth'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/register',
+    redirect: '/login', // Biasanya landing awal ke login jika belum ada session
   },
   {
     path: '/login',
     name: 'Login',
     component: () => import('../views/login.vue'),
-    meta: { requiresAuth: false },
+    meta: { requiresGuest: true }, // Gunakan meta khusus tamu
   },
   {
     path: '/register',
     name: 'Register',
     component: () => import('../views/register.vue'),
-    meta: { requiresAuth: false },
+    meta: { requiresGuest: true },
   },
   {
     path: '/dashboard',
@@ -61,12 +61,17 @@ router.beforeEach(
     next: NavigationGuardNext
   ) => {
     const authStore = useAuthStore()
-    const isAuthenticated = authStore.isAuthenticated
+    
+    // AMBIL TOKEN LANGSUNG DARI STORAGE UNTUK KEAMANAN EKSTRA
+    // Ini memastikan router tidak hanya mengandalkan state Pinia yang mungkin telat update
+    const token = localStorage.getItem('api_token') || authStore.token
 
-    if (to.meta.requiresAuth && !isAuthenticated) {
-      next('/login')
-    } else if ((to.path === '/login' || to.path === '/register') && isAuthenticated) {
-      next('/dashboard')
+    if (to.meta.requiresAuth && !token) {
+      // Jika butuh auth tapi tidak ada token, paksa ke login
+      next({ name: 'Login' })
+    } else if (to.meta.requiresGuest && token) {
+      // Jika sudah login tapi coba buka Login/Register, lempar ke dashboard
+      next({ name: 'Dashboard' })
     } else {
       next()
     }

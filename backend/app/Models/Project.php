@@ -10,6 +10,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 class Project extends Model
 {
     use HasFactory;
+    const OWNER = 1;
+    const MANAGER = 2;
+    const CONTRIBUTOR = 3;
+    const STAKEHOLDER = 4;
 
     protected $fillable = ['name', 'description', 'start_date', 'end_date', 'status'];
 
@@ -26,7 +30,7 @@ class Project extends Model
      * Relasi Many-to-Many ke User (Tim Proyek).
      * Menghubungkan ke tabel pivot 'project_user'.
      */
-    public function members(): BelongsToMany
+    public function members()
     {
         return $this->belongsToMany(User::class, 'project_user')
                     ->withPivot('role_in_project')

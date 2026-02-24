@@ -5,6 +5,8 @@ interface Project {
   id: number
   name: string
   description: string
+  progress : number
+  my_role_id: number
   created_by: number
   created_at: string
   updated_at: string

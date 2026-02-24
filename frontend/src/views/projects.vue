@@ -24,7 +24,7 @@
         </div>
 
         <button 
-          v-if="canManage"
+          v-if="canManageGlobal"
           @click="openCreateModal"
           class="flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/25 active:scale-95"
         >
@@ -49,7 +49,12 @@
           class="bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 hover:bg-slate-800/60 transition-all group flex flex-col hover:shadow-2xl hover:shadow-indigo-500/5"
         >
           <div class="flex justify-between items-start mb-4">
-            <h3 class="text-lg font-bold text-white line-clamp-1" :title="project.name">{{ project.name }}</h3>
+            <div>
+              <h3 class="text-lg font-bold text-white line-clamp-1" :title="project.name">{{ project.name }}</h3>
+              <div v-if="project.my_role_id" :class="['inline-block mt-1 px-2 py-0.5 text-[9px] font-black uppercase tracking-tighter rounded border', roleConfig[project.my_role_id].class]">
+                {{ roleConfig[project.my_role_id].label }}
+              </div>
+            </div>
             <span :class="[
               'px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border',
               project.progress >= 100 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
@@ -83,11 +88,11 @@
               Buka Workspace &rarr;
             </button>
 
-            <div v-if="canManage" class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div v-if="project.my_role_id <= 2" class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button @click="openEditModal(project)" class="p-2 text-slate-400 hover:text-amber-400 bg-slate-700/30 rounded-lg transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
               </button>
-              <button @click="confirmDelete(project.id)" class="p-2 text-slate-400 hover:text-rose-400 bg-slate-700/30 rounded-lg transition-colors">
+              <button v-if="project.my_role_id === 1" @click="confirmDelete(project.id)" class="p-2 text-slate-400 hover:text-rose-400 bg-slate-700/30 rounded-lg transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
               </button>
             </div>
@@ -202,7 +207,7 @@
             <div v-else class="grid grid-cols-1 gap-3">
               <div v-for="task in projectTasks" :key="task.id" class="p-4 bg-slate-800/40 border border-slate-700/50 rounded-2xl flex justify-between items-center group hover:bg-slate-800/80 transition-all">
                 <div>
-                  <h4 class="text-white font-bold text-sm mb-1 group-hover:text-indigo-400 transition-colors">{{ task.title || task.name }}</h4>
+                  <h4 class="text-white font-bold text-sm mb-1 group-hover:text-indigo-400 transition-colors">{{ task.name || task.title }}</h4>
                   <p class="text-[11px] text-slate-500">Assigned: <span class="text-slate-300">{{ task.user?.name || 'Unassigned' }}</span></p>
                 </div>
                 <span :class="['px-3 py-1 text-[10px] font-black uppercase rounded-lg border', 
@@ -217,17 +222,17 @@
           </div>
 
           <div v-if="activeTab === 'members'" class="animate-fade-in">
-            <div v-if="canManage" class="mb-8 p-6 bg-slate-800/50 rounded-2xl border border-slate-700/50 shadow-inner">
-              <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Tambah Anggota Baru</h4>
+            <div v-if="selectedProject?.my_role_id <= 2" class="mb-8 p-6 bg-slate-800/50 rounded-2xl border border-slate-700/50 shadow-inner">
+              <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Undang Anggota</h4>
               <div class="flex flex-col sm:flex-row gap-3">
                 <select v-model="newMemberId" class="flex-grow px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm">
                   <option value="" disabled>Pilih User...</option>
                   <option v-for="u in availableUsers" :key="u.id" :value="u.id">{{ u.name }} ({{ u.email }})</option>
                 </select>
                 <select v-model="newMemberRole" class="w-full sm:w-48 px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm font-medium">
-                  <option value="Anggota Tim">Anggota Tim</option>
-                  <option value="Reviewer">Reviewer</option>
-                  <option value="Project Manager">Project Manager</option>
+                  <option :value="2">Manager</option>
+                  <option :value="3">Contributor</option>
+                  <option :value="4">Stakeholder</option>
                 </select>
                 <button @click="addMember" :disabled="!newMemberId || isAddingMember" class="px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-700 text-white text-sm font-bold rounded-xl transition-all">
                   {{ isAddingMember ? 'Memproses...' : 'Tambahkan' }}
@@ -247,14 +252,13 @@
                   </div>
                 </div>
                 <div class="flex items-center gap-3">
-                   <span class="text-[10px] font-black uppercase text-indigo-300 bg-indigo-500/10 px-2.5 py-1 rounded-md">
-                    {{ member.pivot?.role_in_project || 'Member' }}
+                   <span v-if="member.pivot?.role_in_project" :class="['text-[9px] font-black uppercase px-2 py-1 rounded border', roleConfig[member.pivot.role_in_project].class]">
+                    {{ roleConfig[member.pivot.role_in_project].label }}
                   </span>
                   <button 
-                    v-if="canManage" 
+                    v-if="selectedProject?.my_role_id === 1 && member.pivot?.role_in_project !== 1" 
                     @click="removeMember(member.id)" 
                     class="opacity-0 group-hover/member:opacity-100 p-1.5 text-slate-500 hover:text-rose-400 transition-all"
-                    title="Hapus dari proyek"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   </button>
@@ -262,7 +266,6 @@
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
@@ -278,6 +281,14 @@ import axios from 'axios'
 const authStore = useAuthStore()
 const projectStore = useProjectStore()
 
+// Konfigurasi Role untuk UI
+const roleConfig = {
+  1: { label: 'Owner', class: 'text-rose-400 border-rose-500/30 bg-rose-500/10' },
+  2: { label: 'Manager', class: 'text-blue-400 border-blue-500/30 bg-blue-500/10' },
+  3: { label: 'Contributor', class: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' },
+  4: { label: 'Stakeholder', class: 'text-slate-400 border-slate-500/30 bg-slate-500/10' }
+}
+
 const apiClient = axios.create({
   baseURL: 'http://localhost:8000/api',
   headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
@@ -290,41 +301,40 @@ apiClient.interceptors.request.use(config => {
 })
 
 // --- State Utama ---
-const projects = ref([])
+const projects = computed(() => projectStore.projects || [])
 const loading = ref(false)
 const searchQuery = ref('')
-const currentPage = ref(1) // State untuk pagination
+const currentPage = ref(1)
 
-// --- Modals ---
+// --- Modal State ---
 const showModal = ref(false)
 const isEditing = ref(false)
 const isSubmitting = ref(false)
 const formData = reactive({ id: null, name: '', description: '', start_date: '', end_date: '' })
 
-// --- Details Modal ---
+// --- Detail Workspace State ---
 const showDetailsModal = ref(false)
 const activeTab = ref('tasks')
 const selectedProject = ref(null)
 const projectTasks = ref([])
 const projectMembers = ref([])
 
-// --- Users/Members ---
+// --- Member State ---
 const availableUsers = ref([])
 const newMemberId = ref('')
-const newMemberRole = ref('Anggota Tim')
+const newMemberRole = ref(3) // Default Contributor
 const isAddingMember = ref(false)
 
 // --- Computeds ---
 const user = computed(() => authStore.user)
-const canManage = computed(() => user.value?.role_id === 1 || user.value?.role_id === 2)
+// Hak akses tombol buat proyek secara global (Admin/Manager Level)
+const canManageGlobal = computed(() => user.value?.role_id === 1 || user.value?.role_id === 2)
 
-// Mengecek apakah masih ada halaman selanjutnya dari store
 const hasMore = computed(() => {
   return projectStore.pagination?.current_page < projectStore.pagination?.last_page
 })
 
 const filteredProjects = computed(() => {
-  if (!projects.value) return []
   return projects.value.filter(p => 
     p.name?.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
     p.description?.toLowerCase().includes(searchQuery.value.toLowerCase())
@@ -332,19 +342,15 @@ const filteredProjects = computed(() => {
 })
 
 onMounted(async () => {
-  await loadProjects(1) // Load halaman pertama
-  if (canManage.value) loadAllUsers()
+  await loadProjects(1)
+  if (canManageGlobal.value) loadAllUsers()
 })
 
-// --- Logic Fetch Data ---
+// --- Data Fetching ---
 const loadProjects = async (page = 1) => {
   loading.value = true
   try {
-    // Memanggil store (Pastikan store Anda menerima parameter page)
     await projectStore.fetchProjects(page)
-    
-    // Sinkronisasi data lokal dengan store
-    projects.value = projectStore.projects || []
     currentPage.value = page
   } catch (err) {
     console.error("Fetch Error:", err)
@@ -395,24 +401,24 @@ const submitProject = async () => {
     } else {
       await projectStore.createProject(formData)
     }
-    // Refresh ke halaman 1 setelah aksi sukses
     await loadProjects(1)
     closeModal()
   } catch (err) {
-    alert("Terjadi kesalahan sistem.")
+    alert("Gagal memproses data.")
   } finally { isSubmitting.value = false }
 }
 
 const confirmDelete = async (id) => {
-  if (confirm("Hapus proyek ini? Seluruh data tugas di dalamnya akan hilang.")) {
+  if (confirm("Hapus proyek ini secara permanen?")) {
     try {
       await projectStore.deleteProject(id)
+      // Store otomatis filter state, tapi kita refresh page 1 agar sinkron
       await loadProjects(1)
     } catch (err) { alert("Gagal menghapus.") }
   }
 }
 
-// --- Detail & Member Management ---
+// --- Detail & Workspace Management ---
 const openDetails = async (project) => {
   selectedProject.value = project
   activeTab.value = 'tasks'
@@ -421,6 +427,7 @@ const openDetails = async (project) => {
   projectMembers.value = []
   
   try {
+    // Ambil detail member dan tugas proyek
     const [detailRes, taskRes] = await Promise.all([
       apiClient.get(`/projects/${project.id}`),
       apiClient.get('/tasks')
@@ -440,15 +447,19 @@ const addMember = async () => {
   if (!newMemberId.value || !selectedProject.value) return
   isAddingMember.value = true
   try {
-    const payload = { user_id: newMemberId.value, role: newMemberRole.value }
+    const payload = { 
+      user_id: newMemberId.value, 
+      role_in_project: parseInt(newMemberRole.value) 
+    }
     await apiClient.post(`/projects/${selectedProject.value.id}/members`, payload)
     
+    // Refresh List Member
     const detailRes = await apiClient.get(`/projects/${selectedProject.value.id}`)
     const detailData = detailRes.data.data || detailRes.data
     projectMembers.value = detailData.members || []
     
     newMemberId.value = ''
-    alert("Anggota ditambahkan!")
+    alert("Anggota berhasil ditambahkan!")
   } catch (err) {
     alert(err.response?.data?.message || "Gagal menambahkan.")
   } finally { isAddingMember.value = false }
