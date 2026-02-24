@@ -117,12 +117,9 @@ export const taskService = {
   },
 }
 
-// ==================== PROJECT SERVICE ====================
 
-// ==================== PROJECT SERVICE ====================
 
 export const projectService = {
-  // Ubah Return Type menjadi AxiosResponse saja agar bisa membaca data pagination Laravel
   getAllProjects(page: number = 1): Promise<AxiosResponse> {
     return api.get(`/projects?page=${page}`)
   },

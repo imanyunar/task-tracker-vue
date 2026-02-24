@@ -33,10 +33,8 @@ class ProjectController extends Controller
                 $q->where('user_id', $user->id);
             });
         }
-     
-        $projects = $query->paginate(10);
-
-        $projects->getCollection()->transform(function ($project) {
+        $projects = $query->get();
+        $projects->transform(function ($project) {
             $total = $project->tasks_count;
             $completed = $project->completed_tasks_count;
             $project->progress = $total > 0 ? round(($completed / $total) * 100, 2) : 0;
