@@ -100,28 +100,35 @@ class ProjectController extends Controller
     /**
      * Display the specified project
      */
-    public function show(Request $request, $id) {
-        $user = $request->user();
-        $project = Project::with(['members', 'tasks', 'department'])->find($id);
+   public function show(Request $request, $id) {
+    $user = $request->user();
+    
+    // Pastikan memanggil relasi 'members' dan 'department'
+    $project = Project::with(['members', 'tasks.user', 'department'])->find($id);
 
-        if (!$project) {
-            return response()->json(['success' => false, 'message' => 'Project tidak ditemukan'], 404);
-        }
-
-        $isMember = $project->members->contains('id', $user->id);
-        $isSameDept = (int)$project->department_id === (int)$user->department_id;
-
-        // Tolak akses jika: Bukan Admin DAN Bukan Member DAN Bukan satu departemen
-        if ((int)$user->role_id !== 1 && !$isMember && !$isSameDept) {
-            return response()->json(['success' => false, 'message' => 'Akses ditolak'], 403);
-        }
-
-        $member = $project->members->where('id', $user->id)->first();
-        $project->my_role_id = $member ? $member->pivot->role_in_project : null;
-
-        return response()->json(['success' => true, 'data' => $project], 200);
+    if (!$project) {
+        return response()->json(['success' => false, 'message' => 'Project tidak ditemukan'], 404);
     }
 
+    // Transformasi data agar "datar" dan mudah dibaca Vue
+    $data = [
+        'id'          => $project->id,
+        'name'        => $project->name,
+        'description' => $project->description,
+        'department'  => $project->department->name ?? 'General',
+        'tasks'       => $project->tasks ?? [],
+        'members'     => $project->members->map(function($member) {
+            return [
+                'id'    => $member->id,
+                'name'  => $member->name,
+                'role_in_project' => $member->pivot->role_in_project, // Ambil dari pivot
+                'avatar' => "https://ui-avatars.com/api/?name=" . urlencode($member->name) . "&background=4f46e5&color=fff"
+            ];
+        })
+    ];
+
+    return response()->json(['success' => true, 'data' => $data], 200);
+}
     /**
      * Update the specified project
      */

@@ -88,14 +88,14 @@
           <div class="flex items-center justify-between pt-4 border-t border-slate-700/50">
             <div class="flex items-center gap-3 min-w-0">
               <button @click="openDetails(project)" class="text-sm font-bold text-indigo-400 hover:text-indigo-300 transition-colors whitespace-nowrap shrink-0">
-                Buka Workspace &rarr;
+                Opsi & Info &rarr;
               </button>
 
               <router-link :to="{ name: 'ProjectChat', params: { id: project.id } }" class="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
-                Chat Tim
+                Chat
               </router-link>
             </div>
 
@@ -207,6 +207,14 @@
               <h2 class="text-2xl font-black text-white m-0">{{ selectedProject?.name }}</h2>
             </div>
             <p class="text-slate-400 text-sm max-w-2xl leading-relaxed">{{ selectedProject?.description || 'Tidak ada deskripsi.' }}</p>
+            
+            <button 
+              @click="goToWorkspace(selectedProject.id)"
+              class="mt-4 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-2"
+            >
+              Buka Workspace 
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+            </button>
           </div>
           <button @click="closeDetailsModal" class="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -275,8 +283,8 @@
                   </div>
                 </div>
                 <div class="flex items-center gap-3">
-                   <span v-if="member.pivot?.role_in_project" :class="['text-[9px] font-black uppercase px-2 py-1 rounded border', roleConfig[member.pivot.role_in_project].class]">
-                    {{ roleConfig[member.pivot.role_in_project].label }}
+                   <span v-if="member.pivot?.role_in_project" :class="['text-[9px] font-black uppercase px-2 py-1 rounded border', roleConfig[member.pivot.role_in_project]?.class || '']">
+                    {{ roleConfig[member.pivot.role_in_project]?.label || 'Member' }}
                   </span>
                   <button 
                     v-if="(selectedProject?.my_role_id === 1 || user?.role_id === 1) && member.pivot?.role_in_project !== 1" 
@@ -297,12 +305,14 @@
 
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue'
+import { useRouter } from 'vue-router' // IMPORT ROUTER
 import { useAuthStore } from '../stores/auth'
 import { useProjectStore } from '../stores/project'
 import apiClient from '../services/api'
 
 const authStore = useAuthStore()
 const projectStore = useProjectStore()
+const router = useRouter() // INISIALISASI ROUTER
 
 const roleConfig = {
   1: { label: 'Owner', class: 'text-rose-400 border-rose-500/30 bg-rose-500/10' },
@@ -310,8 +320,6 @@ const roleConfig = {
   3: { label: 'Contributor', class: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' },
   4: { label: 'Stakeholder', class: 'text-slate-400 border-slate-500/30 bg-slate-500/10' }
 }
-
-
 
 const projects = computed(() => projectStore.projects || [])
 const loading = ref(false)
@@ -450,6 +458,7 @@ const confirmDelete = async (id) => {
   }
 }
 
+// FUNGSI INI TETAP MEMBUKA MODAL SEPERTI SEMULA
 const openDetails = async (project) => {
   selectedProject.value = project
   activeTab.value = 'tasks'
@@ -469,6 +478,11 @@ const openDetails = async (project) => {
     const allTasks = taskRes.data.data || taskRes.data || []
     projectTasks.value = allTasks.filter(t => t.project_id === project.id)
   } catch (err) { console.error(err) }
+}
+
+// FUNGSI BARU UNTUK NAVIGASI LANGSUNG
+const goToWorkspace = (projectId) => {
+  router.push({ name: 'ProjectDetail', params: { id: projectId } })
 }
 
 const closeDetailsModal = () => { showDetailsModal.value = false }
