@@ -72,7 +72,7 @@ const getStatusColor = (status) => {
   if (s === 'done' || s === 'selesai' || s.includes('completed')) return 'success'
   if (s === 'doing' || s === 'proses' || s.includes('progress')) return 'primary'
   if (s === 'review' || s === 'urgent') return 'warning'
-  return 'danger' // untuk todo/pending
+  return 'danger' 
 }
 
 const formatDate = (dateStr) => {
@@ -135,10 +135,10 @@ const formatDate = (dateStr) => {
         
         <section v-if="!isViewAll" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div class="card-elevated group relative overflow-hidden" v-for="(item, idx) in [
-            { label: 'Completion', val: (stats?.completion_rate || 0) + '%', sub: 'Tugas Selesai', color: 'text-emerald-400' },
-            { label: 'Timeliness', val: (stats?.timeliness_rate || 0) + '%', sub: 'Tepat Waktu', color: 'text-amber-400' },
-            { label: 'Performance', val: stats?.kpi_score || 0, sub: 'Skor KPI', color: 'text-indigo-400' },
-            { label: 'Projects', val: stats?.total_projects || 0, sub: 'Proyek Aktif', color: 'text-purple-400' }
+            { label: 'My Completion', val: (stats?.completion_rate || 0) + '%', sub: 'Tugas Pribadi Selesai', color: 'text-emerald-400' },
+            { label: 'My Timeliness', val: (stats?.timeliness_rate || 0) + '%', sub: 'Tepat Waktu Saya', color: 'text-amber-400' },
+            { label: 'My Performance', val: stats?.kpi_score || 0, sub: 'Skor KPI Pribadi', color: 'text-indigo-400' },
+            { label: 'Unit Projects', val: stats?.total_projects || 0, sub: 'Total Proyek Aktif', color: 'text-purple-400' }
           ]" :key="idx">
             <div class="card-body relative z-10">
               <p class="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-2">{{ item.label }}</p>
@@ -212,7 +212,7 @@ const formatDate = (dateStr) => {
           <aside v-if="!isViewAll" class="lg:col-span-4 space-y-6 animate-slide-up">
             <div class="card-elevated text-center py-12 relative overflow-hidden bg-gradient-to-br from-indigo-900/40 to-slate-900/40 border border-white/5 shadow-2xl rounded-3xl">
               <div class="relative z-10">
-                <p class="text-indigo-400 text-[10px] font-black uppercase tracking-[0.4em] mb-4">Indeks Performa</p>
+                <p class="text-indigo-400 text-[10px] font-black uppercase tracking-[0.4em] mb-4">Indeks Performa Saya</p>
                 <div class="inline-block relative">
                    <div class="absolute inset-0 bg-indigo-500 blur-[50px] opacity-20 animate-pulse"></div>
                    <h2 class="text-8xl font-black text-white relative leading-none">{{ stats?.kpi_score || 0 }}</h2>
@@ -223,18 +223,18 @@ const formatDate = (dateStr) => {
                   <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
                 </div>
                 <p class="text-slate-500 text-[10px] mt-8 px-10 leading-relaxed italic">
-                  Data disinkronisasi otomatis dengan sistem evaluasi departemen.
+                  Data performa murni berdasarkan tugas pribadi Anda.
                 </p>
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
               <div class="glass p-6 rounded-3xl border border-white/5 shadow-lg">
-                <p class="text-slate-500 text-[10px] font-bold uppercase mb-1">Total</p>
+                <p class="text-slate-500 text-[10px] font-bold uppercase mb-1">Total Unit</p>
                 <p class="text-3xl font-bold text-white">{{ stats?.total_tasks || 0 }}</p>
               </div>
               <div class="glass p-6 rounded-3xl border border-white/5 shadow-lg">
-                <p class="text-slate-500 text-[10px] font-bold uppercase mb-1">Selesai</p>
+                <p class="text-slate-500 text-[10px] font-bold uppercase mb-1">Unit Selesai</p>
                 <p class="text-3xl font-bold text-emerald-400">{{ stats?.completed_tasks || 0 }}</p>
               </div>
             </div>

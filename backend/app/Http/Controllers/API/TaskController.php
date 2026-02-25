@@ -14,12 +14,11 @@ class TaskController extends Controller
     {
         $user = $request->user();
         $query = Task::with(['project', 'user']);
-        if ($user->role_id == 3){
+        if ($user->role_id == 3) {
             $tasks = $query->whereHas('project.members', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             })->get();
-
-        }else{
+        } else {
             $tasks = $query->get();
         }
         return response()->json($tasks, 200);
@@ -28,40 +27,41 @@ class TaskController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        if($user ->role_id == 3){
+        if ($user->role_id == 3) {
             return response()->json([
                 'success' => false,
                 'message' => 'Akses ditolak'
             ], 403);
-        }else{ 
+        } else {
             $validator = Validator::make($request->all(), [
-            'project_id' => 'required|exists:projects,id',
-            'user_id' => 'required|exists:users,id',
-            'title' => 'required|string',
-            'description' => 'nullable|string',
-            'priority' => 'required|in:low,medium,high,urgent',
-            'status' => 'required|in:todo,review,doing,done',
-            'due_date' => 'nullable|date',
-        ]);
+                'project_id' => 'required|exists:projects,id',
+                'user_id' => 'required|exists:users,id',
+                'title' => 'required|string',
+                'description' => 'nullable|string',
+                'priority' => 'required|in:low,medium,high,urgent',
+                'status' => 'required|in:todo,review,doing,done',
+                'due_date' => 'nullable|date',
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
+            if ($validator->fails()) {
+                return response()->json($validator->errors(), 422);
+            }
 
-        $task = Task::create($request->all());
+            $task = Task::create($request->all());
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Tugas Berhasil Dibuat',
-            'task' => $task
-        ], 201);
+            return response()->json([
+                'success' => true,
+                'message' => 'Tugas Berhasil Dibuat',
+                'task' => $task
+            ], 201);
         }
     }
 
-    public function update(Request $request, $id){
+    public function update(Request $request, $id)
+    {
         $user = $request->user();
         $task = Task::findOrFail($id);
-        if($user ->role_id == 3){
+        if ($user->role_id == 3) {
             $isMember = $task->project->members()->where('user_id', $user->id)->exists();
             if (!$isMember) {
                 return response()->json([
@@ -69,9 +69,8 @@ class TaskController extends Controller
                     'message' => 'Akses ditolak'
                 ], 403);
             }
-                    $task->update($request->only('status'));
-
-        }else{
+            $task->update($request->only('status'));
+        } else {
             $task->update($request->all());
         }
         return response()->json([
@@ -85,12 +84,12 @@ class TaskController extends Controller
     {
         $user = $request->user();
         $task = Task::findOrFail($id);
-        if($user ->role_id == 3){
+        if ($user->role_id == 3) {
             return response()->json([
                 'success' => false,
                 'message' => 'Akses ditolak'
             ], 403);
-        }else{
+        } else {
             $task->delete();
         }
         return response()->json([
@@ -107,15 +106,13 @@ class TaskController extends Controller
             $isMember = Project::where('id', $projectId)
                 ->whereHas('members', function ($query) use ($user) {
                     $query->where('user_id', $user->id);
-           
-            });
+                });
             if (!$isMember->exists()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Akses ditolak'
                 ], 403);
             }
-          
         }
         $taskslist = $task->orderBy('due_date')->paginate(10);
 
@@ -125,89 +122,102 @@ class TaskController extends Controller
         ], 200);
     }
 
-   public function getDashboardStats(Request $request)
-   {
-       $user = $request->user();
-       
-       if ($user->role_id == 3) {
-           // Employee: hanya tasks dari projects yang mereka ikuti
-           $totalTasks = Task::whereHas('project.members', function ($query) use ($user) {
-               $query->where('user_id', $user->id);
-           })->count();
-           
-           $completedTasks = Task::whereHas('project.members', function ($query) use ($user) {
-               $query->where('user_id', $user->id);
-           })->where('status', 'done')->count();
-           
-           $pendingTasks = Task::whereHas('project.members', function ($query) use ($user) {
-               $query->where('user_id', $user->id);
-           })->where('status', '!=', 'done')->count();
-           
-           $totalProjects = $user->projects()->count();
-       } else {
-           // Admin/Manager: semua data di database
-           $totalTasks = Task::count();
-           $completedTasks = Task::where('status', 'done')->count();
-           $pendingTasks = Task::where('status', '!=', 'done')->count();
-           $totalProjects = Project::count();
-       }
-       
-       // KPI Calculation
-       $completionRate = $totalTasks > 0 ? ($completedTasks / $totalTasks) * 100 : 0;
-       $onTimeTasks = Task::where('status', 'done')
-           ->whereColumn('updated_at', '<=', 'due_date')->count();
-       $timelinessRate = $completedTasks > 0 ? ($onTimeTasks / $completedTasks) * 100 : 0;
-       $kpiScore = round(($completionRate * 0.6) + ($timelinessRate * 0.4), 2);
-
-       return response()->json([
-           'success' => true,
-           'total_tasks' => $totalTasks,
-           'completed_tasks' => $completedTasks,
-           'pending_tasks' => $pendingTasks,
-           'total_projects' => $totalProjects,
-           'completion_rate' => round($completionRate, 1),
-           'timeliness_rate' => round($timelinessRate, 1),
-           'kpi_score' => $kpiScore
-       ], 200);
-   }
-
-public function show ($id){
-     $task = Task::with('project', 'user.department') -> findOrFail($id);
-     return response()->json([
-        'success' => true,
-        'data' => $task,
-     ], 200);
-}
-
-public function getKPIStats(Request $request)
+    public function getDashboardStats(Request $request)
 {
     $user = $request->user();
 
-    $totalTasks = Task::where('user_id', $user->id)->count();
-    $doneTasks = Task::where('user_id', $user->id)->where('status', 'done')->count();
-    $completionRate = $totalTasks > 0 ? ($doneTasks / $totalTasks) * 100 : 0;
-
-    $onTimeTasks = Task::where('user_id', $user->id)
-                    ->where('status', 'done')
-                    ->whereColumn('updated_at', '<=', 'due_date')->count();
-    $timelinessRate = $doneTasks > 0 ? ($onTimeTasks / $doneTasks) * 100 : 0;
-
-    $projectCount = Project::whereHas('members', function($q) use ($user) {
+    /** * 1. DEFINISI QUERY DASAR (SINKRON DENGAN INDEX)
+     * Kita hanya menghitung tugas yang ada di dalam proyek di mana user adalah anggotanya.
+     */
+    $baseTaskQuery = Task::whereHas('project.members', function ($q) use ($user) {
         $q->where('user_id', $user->id);
-    })->count();
-    $projectScore = min($projectCount * 20, 100); 
+    });
 
-    $finalKPI = ($completionRate * 0.6) + ($timelinessRate * 0.3) + ($projectScore * 0.1);
+    // --- LOGIKA BOX STATISTIK (KANAN BAWAH) ---
+    if ($user->role_id == 3) {
+        // Employee: Statistik hanya berdasarkan proyek yang diikuti
+        $totalTasks = (clone $baseTaskQuery)->count();
+        $completedTasks = (clone $baseTaskQuery)->whereRaw('LOWER(status) = ?', ['done'])->count();
+        $pendingTasks = (clone $baseTaskQuery)->whereRaw('LOWER(status) != ?', ['done'])->count();
+        $totalProjects = $user->projects()->count();
+    } else {
+        // Admin/Manager: Statistik global satu perusahaan
+        $totalTasks = Task::count();
+        $completedTasks = Task::whereRaw('LOWER(status) = ?', ['done'])->count();
+        $pendingTasks = Task::whereRaw('LOWER(status) != ?', ['done'])->count();
+        $totalProjects = Project::count();
+    }
+
+    /**
+     * 2. LOGIKA KPI (MURNI PERSONAL & SINKRON)
+     * Hanya menghitung tugas yang user_id-nya adalah kamu 
+     * DAN berada di dalam proyek yang kamu ikuti.
+     */
+    $myPersonalTasks = (clone $baseTaskQuery)->where('user_id', $user->id);
+    
+    $myTotal = (clone $myPersonalTasks)->count();
+    $myDone = (clone $myPersonalTasks)->whereRaw('LOWER(status) = ?', ['done'])->count();
+    
+    // Hitung Ketepatan Waktu (On-Time)
+    $myOnTime = (clone $myPersonalTasks)
+        ->whereRaw('LOWER(status) = ?', ['done'])
+        ->whereColumn('updated_at', '<=', 'due_date')
+        ->count();
+
+    // Kalkulasi Rate
+    $compRate = $myTotal > 0 ? ($myDone / $myTotal) * 100 : 0;
+    $timeRate = $myDone > 0 ? ($myOnTime / $myDone) * 100 : 0;
+    $kpiScore = round(($compRate * 0.6) + ($timeRate * 0.4), 2);
 
     return response()->json([
         'success' => true,
-        'score' => round($finalKPI, 2),
-        'metrics' => [
-            'completion' => round($completionRate),
-            'attendance' => 0, 
-            'timeliness' => round($timelinessRate),
-            'projects'   => $projectCount
-        ]
-    ]);
+        'total_tasks' => $totalTasks,
+        'completed_tasks' => $completedTasks,
+        'pending_tasks' => $pendingTasks,
+        'total_projects' => $totalProjects,
+        'completion_rate' => round($compRate, 1),
+        'timeliness_rate' => round($timeRate, 1),
+        'kpi_score' => $kpiScore
+    ], 200);
 }
+
+    public function show($id)
+    {
+        $task = Task::with('project', 'user.department')->findOrFail($id);
+        return response()->json([
+            'success' => true,
+            'data' => $task,
+        ], 200);
+    }
+
+    public function getKPIStats(Request $request)
+    {
+        $user = $request->user();
+        $totalTasks = Task::where('user_id', $user->id)->count();
+        $doneTasks = Task::where('user_id', $user->id)->where('status', 'done')->count();
+        $completionRate = $totalTasks > 0 ? ($doneTasks / $totalTasks) * 100 : 0;
+
+        $onTimeTasks = Task::where('user_id', $user->id)
+            ->where('status', 'done')
+            ->whereColumn('updated_at', '<=', 'due_date')->count();
+        $timelinessRate = $doneTasks > 0 ? ($onTimeTasks / $doneTasks) * 100 : 0;
+
+        $projectCount = Project::whereHas('members', function ($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })->count();
+        $projectScore = min($projectCount * 20, 100);
+
+        $finalKPI = ($completionRate * 0.6) + ($timelinessRate * 0.3) + ($projectScore * 0.1);
+
+        return response()->json([
+            'success' => true,
+            'score' => round($finalKPI, 2),
+            'metrics' => [
+                'completion' => round($completionRate),
+                'attendance' => 0,
+                'timeliness' => round($timelinessRate),
+                'projects'   => $projectCount
+            ]
+        ]);
+    }
 }
