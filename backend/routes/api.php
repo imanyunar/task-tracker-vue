@@ -7,6 +7,7 @@ use App\Http\Controllers\API\UserController;
 use App\Http\Controllers\API\DepartmentController;
 use App\Http\Controllers\API\ProjectController;
 use App\Http\Controllers\API\ProfileController;
+use App\Http\Controllers\API\ChatController;
 
 // ==========================================
 // PUBLIC ROUTES (Tidak perlu login)
@@ -59,6 +60,8 @@ Route::middleware('auth.manual')->group(function () {
     
     // Project Specific Actions
     Route::get('/projects/search', [ProjectController::class, 'search']);
+    Route::get('/projects/{projectId}/chats', [ChatController::class, 'index']);
+    Route::post('/projects/{projectId}/chats', [ChatController::class, 'store']);
     Route::post('/projects/{id}/members', [ProjectController::class, 'addMember']);
     Route::get('/projects/{projectId}/tasks', [TaskController::class, 'tasksByProject']);
     

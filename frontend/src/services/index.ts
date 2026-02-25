@@ -8,15 +8,27 @@ export interface AuthResponse {
   user: User
 }
 
+export interface ChatMessage {
+  id: number
+  project_id: number  
+  user_id: number
+  message: string
+  created_at: string
+  user: {
+    id: number
+    name: string
+  } 
+}
+
 export interface Task {
   id: number
-  title: string         // Sesuai Laravel
+  title: string
   description: string
   project_id: number
   user_id: number
   priority: string
   status: string
-  due_date: string      // Sesuai Laravel
+  due_date: string
   created_at: string
   updated_at: string
   user?: User
@@ -27,8 +39,8 @@ export interface Project {
   id: number
   name: string
   description: string
-  start_date: string; // Tambahkan ini
-  end_date: string;   // Tambahkan ini
+  start_date: string
+  end_date: string
   created_by: number
   created_at: string
   updated_at: string
@@ -40,7 +52,7 @@ export interface User {
   name: string
   email: string
   role_id: number
-  department_id: number // Konsisten menggunakan department_id
+  department_id: number
   role?: {
     id: number
     name: string
@@ -81,7 +93,7 @@ export const authService = {
 
 export const profileService = {
   getProfile(): Promise<AxiosResponse<{ data: User }>> {
-    return api.get('/profile') // Menggunakan /profile agar tidak 404 saat refresh
+    return api.get('/profile')
   },
 
   updateProfile(profileData: Partial<User>): Promise<AxiosResponse<{ data: User }>> {
@@ -117,7 +129,7 @@ export const taskService = {
   },
 }
 
-
+// ==================== PROJECT SERVICE ====================
 
 export const projectService = {
   getAllProjects(page: number = 1): Promise<AxiosResponse> {
@@ -140,14 +152,26 @@ export const projectService = {
     return api.delete(`/projects/${id}`)
   },
   
-  addMember(projectId: number, payload: { user_id: number, role: string }): Promise<AxiosResponse> {
+  addMember(projectId: number, payload: { user_id: number; role: string }): Promise<AxiosResponse> {
     return api.post(`/projects/${projectId}/members`, payload)
   },
 
-  // Tambahkan fungsi ini agar error di useProjects.ts hilang
   searchProjects(query: string): Promise<AxiosResponse> {
     return api.get('/projects/search', {
       params: { q: query }
+    })
+  },
+
+  // Perbaikan: Menggunakan ChatMessage (PascalCase) sesuai definisi interface di atas
+  getMessages(projectId: number, lastId: number = 0): Promise<AxiosResponse<ChatMessage[]>> {
+    return api.get(`/projects/${projectId}/chats`, { 
+      params: { last_id: lastId } 
+    })
+  },
+
+  sendMessage(projectId: number, message: string): Promise<AxiosResponse<ChatMessage>> {
+    return api.post(`/projects/${projectId}/chats`, { 
+      message: message 
     })
   }
 }
@@ -155,9 +179,13 @@ export const projectService = {
 // ==================== USER & DEPT SERVICE ====================
 
 export const userService = {
-  getAllUsers(): Promise<AxiosResponse<{ data: User[] }>> { return api.get('/users') }
+  getAllUsers(): Promise<AxiosResponse<{ data: User[] }>> { 
+    return api.get('/users') 
+  }
 }
 
 export const departmentService = {
-  getAllDepartments(): Promise<AxiosResponse<{ data: any[] }>> { return api.get('/departments') }
+  getAllDepartments(): Promise<AxiosResponse<{ data: any[] }>> { 
+    return api.get('/departments') 
+  }
 }

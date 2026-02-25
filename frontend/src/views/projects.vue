@@ -86,14 +86,20 @@
           </div>
 
           <div class="flex items-center justify-between pt-4 border-t border-slate-700/50">
-            <button 
-              @click="openDetails(project)"
-              class="text-sm font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
-            >
-              Buka Workspace &rarr;
-            </button>
+            <div class="flex items-center gap-3 min-w-0">
+              <button @click="openDetails(project)" class="text-sm font-bold text-indigo-400 hover:text-indigo-300 transition-colors whitespace-nowrap shrink-0">
+                Buka Workspace &rarr;
+              </button>
 
-            <div v-if="project.my_role_id <= 2 || user?.role_id === 1" class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <router-link :to="{ name: 'ProjectChat', params: { id: project.id } }" class="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                Chat Tim
+              </router-link>
+            </div>
+
+            <div v-if="project.my_role_id <= 2 || user?.role_id === 1" class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
               <button @click="openEditModal(project)" class="p-2 text-slate-400 hover:text-amber-400 bg-slate-700/30 rounded-lg transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
               </button>
@@ -106,11 +112,7 @@
       </div>
 
       <div v-if="hasMore" class="mt-12 flex justify-center pb-8">
-        <button 
-          @click="loadMore"
-          :disabled="loading"
-          class="flex items-center gap-3 px-8 py-3 bg-slate-800 border border-slate-700 rounded-2xl text-slate-300 hover:text-white hover:border-indigo-500/50 transition-all shadow-xl disabled:opacity-50"
-        >
+        <button @click="loadMore" :disabled="loading" class="flex items-center gap-3 px-8 py-3 bg-slate-800 border border-slate-700 rounded-2xl text-slate-300 hover:text-white hover:border-indigo-500/50 transition-all shadow-xl disabled:opacity-50">
           <div v-if="loading" class="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
           <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 13l-7 7-7-7" />
@@ -297,7 +299,7 @@
 import { ref, computed, onMounted, reactive } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useProjectStore } from '../stores/project'
-import axios from 'axios'
+import apiClient from '../services/api'
 
 const authStore = useAuthStore()
 const projectStore = useProjectStore()
@@ -309,25 +311,14 @@ const roleConfig = {
   4: { label: 'Stakeholder', class: 'text-slate-400 border-slate-500/30 bg-slate-500/10' }
 }
 
-const apiClient = axios.create({
-  baseURL: 'http://localhost:8000/api',
-  headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
-})
 
-apiClient.interceptors.request.use(config => {
-  const token = localStorage.getItem('api_token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
 
-// --- State Utama ---
 const projects = computed(() => projectStore.projects || [])
 const loading = ref(false)
 const searchQuery = ref('')
 const currentPage = ref(1)
-const departments = ref([]) // State baru untuk Departemen
+const departments = ref([])
 
-// --- Modal State ---
 const showModal = ref(false)
 const isEditing = ref(false)
 const isSubmitting = ref(false)
@@ -337,23 +328,20 @@ const formData = reactive({
     description: '', 
     start_date: '', 
     end_date: '',
-    department_id: '' // State baru di formData
+    department_id: '' 
 })
 
-// --- Detail Workspace State ---
 const showDetailsModal = ref(false)
 const activeTab = ref('tasks')
 const selectedProject = ref(null)
 const projectTasks = ref([])
 const projectMembers = ref([])
 
-// --- Member State ---
 const availableUsers = ref([])
 const newMemberId = ref('')
 const newMemberRole = ref(3) 
 const isAddingMember = ref(false)
 
-// --- Computeds ---
 const user = computed(() => authStore.user)
 const canManageGlobal = computed(() => user.value?.role_id === 1 || user.value?.role_id === 2)
 
@@ -372,11 +360,10 @@ onMounted(async () => {
   await loadProjects(1)
   if (canManageGlobal.value) {
       loadAllUsers()
-      loadDepartments() // Load departemen jika admin
+      loadDepartments()
   }
 })
 
-// --- Data Fetching ---
 const loadProjects = async (page = 1) => {
   loading.value = true
   try {
@@ -406,13 +393,11 @@ const loadMore = async () => {
 
 const loadAllUsers = async () => {
   try {
-    // API ini harus memfilter user berdasarkan departemen di backend jika role !== 1
     const res = await apiClient.get('/users')
     availableUsers.value = res.data.data || res.data || []
   } catch (err) { console.error(err) }
 }
 
-// --- CRUD Actions ---
 const openCreateModal = () => {
   isEditing.value = false
   Object.assign(formData, { 
@@ -465,7 +450,6 @@ const confirmDelete = async (id) => {
   }
 }
 
-// --- Detail & Workspace Management ---
 const openDetails = async (project) => {
   selectedProject.value = project
   activeTab.value = 'tasks'
