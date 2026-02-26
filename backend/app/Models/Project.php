@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-
+use App\Models\Post;
 class Project extends Model
 {
     use HasFactory;
@@ -65,4 +65,10 @@ public function user()
                 ->withPivot('role_in_project')
                 ->limit(1);
 }
+
+public function posts(): HasMany
+{
+    return $this->hasMany(Post::class);
+}
+
 }

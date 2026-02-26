@@ -8,7 +8,7 @@ use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Response;
-
+use App\Models\Post;
 class ProjectController extends Controller
 {
     /**
@@ -104,7 +104,7 @@ class ProjectController extends Controller
     $user = $request->user();
     
     // Pastikan memanggil relasi 'members' dan 'department'
-    $project = Project::with(['members', 'tasks.user', 'department'])->find($id);
+    $project = Project::with(['members', 'tasks.user', 'department', 'posts.user'])->find($id);
 
     if (!$project) {
         return response()->json(['success' => false, 'message' => 'Project tidak ditemukan'], 404);
@@ -117,6 +117,7 @@ class ProjectController extends Controller
         'description' => $project->description,
         'department'  => $project->department->name ?? 'General',
         'tasks'       => $project->tasks ?? [],
+        'posts'       => $project->posts ?? [],
         'members'     => $project->members->map(function($member) {
             return [
                 'id'    => $member->id,
@@ -228,5 +229,21 @@ class ProjectController extends Controller
     ]);
 
     return response()->json(['success' => true, 'message' => 'Role anggota berhasil diatur']);
+}
+
+
+public function storePost(Request $request, $id){
+
+$request->validate([
+    'content' => 'required|string',
+]);
+
+$post = Post::create([
+    'project_id' => $id,
+    'user_id' => $request->user()->id,
+    'content' => $request->content,
+]);
+
+return response()->json(['success' => true, 'data' => $post], 201);
 }
 }

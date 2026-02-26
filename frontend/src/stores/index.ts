@@ -31,7 +31,6 @@ export const useTaskStore = defineStore('task', () => {
     loading.value = true
     try {
       const response = await taskService.getAllTasks()
-      // Menangani struktur response Laravel yang biasanya membungkus data dalam properti 'data'
       const data = (response.data as any).data || response.data
       tasks.value = Array.isArray(data) ? data : []
     } catch (err: any) {
@@ -134,5 +133,25 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  return { users, profile, loading, fetchProfile }
+  const updateProfile = async (userData: Partial<User>) => {
+    loading.value = true
+    try {
+      const response = await profileService.updateProfile(userData)
+      const updatedData = (response.data as any).data || (response.data as any).user || response.data
+      
+      profile.value = updatedData as User
+      
+      const currentAuthuser= sessionStorage.getItem('user_data')
+      if (currentAuthuser) {
+        sessionStorage.setItem('user_data', JSON.stringify(updatedData))
+      }
+      return updatedData
+    } catch (err: any) {
+      console.error("Gagal update profile:", err) 
+      throw err
+    }finally {
+      loading.value = false
+    }   
+  }  
+  return { users, profile, loading, fetchProfile, updateProfile }
 })

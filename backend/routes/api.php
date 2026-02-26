@@ -64,6 +64,7 @@ Route::middleware('auth.manual')->group(function () {
     Route::post('/projects/{projectId}/chats', [ChatController::class, 'store']);
     Route::post('/projects/{id}/members', [ProjectController::class, 'addMember']);
     Route::get('/projects/{projectId}/tasks', [TaskController::class, 'tasksByProject']);
+    Route::post('/projects/{id}/posts', [ProjectController::class, 'storePost']);
     
     // ------------------------------------------
     // 3. RUTE RESOURCE (WAJIB DI BAWAH!)

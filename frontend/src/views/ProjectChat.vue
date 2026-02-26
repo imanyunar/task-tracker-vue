@@ -1,204 +1,150 @@
 <template>
-  <div class="p-6 max-w-7xl mx-auto">
-    <div class="mb-6">
-      <h1 class="text-3xl font-extrabold text-white tracking-tight">
-        Project <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">Discussion</span>
-      </h1>
-      <p class="text-slate-400 mt-2 text-sm">Berkomunikasi secara real-time dengan anggota tim dalam proyek ini.</p>
+  <div class="min-h-screen bg-slate-900 pt-20 pb-12 text-slate-200">
+    <div v-if="loading" class="flex flex-col items-center justify-center py-40">
+      <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="mt-4 text-slate-500 font-bold tracking-widest uppercase text-xs">Menyinkronkan...</p>
     </div>
 
-    <div class="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[70vh]">
+    <div v-else-if="project" class="max-w-6xl mx-auto px-4 sm:px-6">
       
-      <div class="p-4 bg-slate-800/60 border-b border-slate-700/50 flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-            </svg>
-          </div>
-          <div>
-            <h2 class="text-white font-bold text-lg leading-tight">Grup Diskusi</h2>
-            <div class="flex items-center gap-2">
-              <span class="relative flex h-2 w-2">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Live Polling Active</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div ref="chatContainer" class="flex-grow overflow-y-auto p-6 space-y-6 custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
-        <div v-if="messages.length === 0" class="flex flex-col items-center justify-center h-full text-slate-500 space-y-4">
-          <div class="p-4 bg-slate-800/50 rounded-full">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
-            </svg>
-          </div>
-          <p class="italic">Belum ada percakapan. Mulailah diskusi tim Anda di sini.</p>
-        </div>
-        
-        <div v-for="chat in messages" :key="chat.id" 
-             :class="['flex w-full', chat.user_id === authStore.user?.id ? 'justify-end' : 'justify-start']">
-          
-          <div :class="['flex flex-col max-w-[75%]', chat.user_id === authStore.user?.id ? 'items-end' : 'items-start']">
-            <div class="flex items-center gap-2 mb-1 px-1">
-              <span class="text-xs font-bold text-slate-300" v-if="chat.user_id !== authStore.user?.id">
-                {{ chat.user.name }}
-              </span>
-              <span class="text-[10px] text-slate-500 font-medium italic">{{ formatTime(chat.created_at) }}</span>
-            </div>
-            
-            <div :class="[
-              'px-4 py-3 rounded-2xl text-sm shadow-lg transition-all duration-300 transform hover:scale-[1.01]',
-              chat.user_id === authStore.user?.id 
-                ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-tr-none border border-indigo-500/30' 
-                : 'bg-slate-800/80 backdrop-blur-md text-slate-200 rounded-tl-none border border-slate-700 hover:border-slate-600'
-            ]">
-              {{ chat.message }}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="p-4 bg-slate-800/80 border-t border-slate-700/50 backdrop-blur-md">
-        <form @submit.prevent="handleSendMessage" class="flex items-center gap-3">
-          <div class="relative flex-grow">
-            <input 
-              v-model="newMessage" 
-              type="text" 
-              placeholder="Tulis pesan untuk tim..." 
-              class="w-full bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
-              :disabled="isSending"
-            />
-          </div>
-          <button 
-            type="submit" 
-            :disabled="isSending || !newMessage.trim()"
-            class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2 group"
-          >
-            <span v-if="isSending" class="animate-pulse">Mengirim...</span>
-            <template v-else>
-              <span>Kirim</span>
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transform group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </template>
+      <div class="relative bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-8 mb-8 shadow-2xl border border-white/10">
+        <div class="relative z-10">
+          <button @click="$router.push('/projects')" class="flex items-center gap-2 text-indigo-100/70 hover:text-white transition-colors mb-4 text-sm font-bold">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+            Kembali
           </button>
-        </form>
+          <h1 class="text-3xl md:text-5xl font-black text-white tracking-tight mb-2">{{ project.name }}</h1>
+          <p class="text-indigo-100 text-lg opacity-80">{{ project.department }}</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-center border-b border-slate-800 mb-8 sticky top-[72px] bg-slate-900/80 backdrop-blur-md z-20">
+        <button 
+          v-for="tab in ['stream', 'tasks', 'people']" :key="tab"
+          @click="currentTab = tab"
+          :class="['px-8 py-4 text-xs font-black uppercase tracking-[0.2em] transition-all border-b-2', 
+          currentTab === tab ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-300']"
+        >
+          {{ tab === 'stream' ? 'Forum' : tab === 'tasks' ? 'Daftar Tugas' : 'Anggota Tim' }}
+        </button>
+      </div>
+
+      <div class="max-w-4xl mx-auto">
+        
+        <div v-if="currentTab === 'stream'" class="space-y-6 animate-slide-up">
+          <div class="bg-slate-800/40 border border-slate-700/50 p-4 rounded-2xl flex items-center gap-4 shadow-lg">
+            <img :src="`https://ui-avatars.com/api/?name=User&background=4f46e5&color=fff`" class="w-10 h-10 rounded-full">
+            <div class="flex-1 bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-slate-500 text-sm cursor-pointer hover:bg-slate-800/50 transition-all">
+              Umumkan sesuatu ke tim Anda...
+            </div>
+          </div>
+
+          <div v-if="project.tasks && project.tasks.length > 0" class="space-y-4">
+            <div v-for="task in project.tasks.slice().reverse()" :key="'stream-'+task.id" class="bg-slate-800/40 border border-slate-700/50 p-5 rounded-2xl flex items-start gap-4 hover:border-indigo-500/30 transition-all">
+              <div class="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-500/20">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+              </div>
+              <div class="flex-1">
+                <div class="flex justify-between items-start">
+                  <p class="text-sm text-slate-300">
+                    <span class="font-bold text-white">Sistem</span> memposting tugas baru: 
+                    <span class="text-indigo-400 font-semibold">{{ task.title }}</span>
+                  </p>
+                  <span class="text-[10px] text-slate-500 uppercase font-black">Baru saja</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Silakan cek detail tugas di tab Daftar Tugas.</p>
+              </div>
+            </div>
+          </div>
+          <p v-else class="text-center py-20 text-slate-500 italic">Belum ada aktivitas di forum ini.</p>
+        </div>
+
+        <div v-if="currentTab === 'tasks'" class="space-y-4 animate-slide-up">
+          <div v-if="project.tasks && project.tasks.length > 0" class="grid gap-4">
+            <div v-for="task in project.tasks" :key="task.id" class="bg-slate-800/40 border border-slate-700/50 p-5 rounded-2xl flex items-center justify-between group hover:border-indigo-500/50 transition-all">
+              <div class="flex items-center gap-4">
+                <div class="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center border border-indigo-500/20 text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                </div>
+                <div>
+                  <h4 class="text-white font-bold group-hover:text-indigo-400 transition-colors">{{ task.title }}</h4>
+                  <div class="flex items-center gap-3 mt-1">
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest px-2 py-0.5 bg-slate-900 rounded-md border border-slate-700">Status: {{ task.status }}</p>
+                    <p v-if="task.due_date" class="text-[10px] text-rose-400 font-bold uppercase tracking-widest">Deadline: {{ task.due_date }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p v-else class="text-center py-20 text-slate-500 italic">Belum ada tugas.</p>
+        </div>
+
+        <div v-if="currentTab === 'people'" class="animate-slide-up grid grid-cols-1 md:grid-cols-2 gap-6">
+           <div class="bg-slate-800/40 border border-slate-700/50 rounded-3xl overflow-hidden shadow-xl">
+              <div class="p-5 border-b border-slate-700 bg-slate-800/20 font-black text-[10px] uppercase tracking-widest text-indigo-400">Managers / Owners</div>
+              <div class="p-6 space-y-4">
+                 <div v-if="managers.length > 0">
+                    <div v-for="m in managers" :key="m.id" class="flex items-center gap-4 mb-4 last:mb-0">
+                        <img :src="m.avatar" class="w-10 h-10 rounded-full border-2 border-indigo-500/30">
+                        <span class="font-bold text-white">{{ m.name }}</span>
+                    </div>
+                 </div>
+                 <p v-else class="text-slate-600 text-sm italic">Tidak ada manager terdaftar.</p>
+              </div>
+           </div>
+
+           <div class="bg-slate-800/40 border border-slate-700/50 rounded-3xl overflow-hidden shadow-xl">
+              <div class="p-5 border-b border-slate-700 bg-slate-800/20 font-black text-[10px] uppercase tracking-widest text-slate-400">Team Members</div>
+              <div class="p-6 space-y-4">
+                 <div v-if="staff.length > 0">
+                    <div v-for="s in staff" :key="s.id" class="flex items-center gap-4 mb-4 last:mb-0">
+                        <img :src="s.avatar" class="w-10 h-10 rounded-full border-2 border-slate-700">
+                        <span class="font-bold text-white">{{ s.name }}</span>
+                    </div>
+                 </div>
+                 <p v-else class="text-slate-600 text-sm italic">Belum ada anggota tim.</p>
+              </div>
+           </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
-import { projectService } from '../services'
+import { ref, onMounted, computed } from 'vue';
+import { useRoute } from 'vue-router';
+import apiClient from '../services/api';
 
-const route = useRoute()
-const authStore = useAuthStore()
-const projectId = route.params.id
+const route = useRoute();
+const project = ref(null);
+const loading = ref(true);
+const currentTab = ref('stream'); // Default tab diubah ke 'stream' agar mirip Classroom
 
-const messages = ref([])
-const newMessage = ref('')
-const lastMessageId = ref(0)
-const isSending = ref(false)
-const chatContainer = ref(null)
-let pollInterval = null
+const managers = computed(() => {
+  return project.value?.members?.filter(m => m.role_in_project <= 2) || [];
+});
 
-// Scroll ke pesan terbaru
-const scrollToBottom = async () => {
-  await nextTick()
-  if (chatContainer.value) {
-    chatContainer.value.scrollTo({
-      top: chatContainer.value.scrollHeight,
-      behavior: 'smooth'
-    })
-  }
-}
+const staff = computed(() => {
+  return project.value?.members?.filter(m => m.role_in_project > 2) || [];
+});
 
-// Format waktu dari server
-const formatTime = (dateString) => {
-  const date = new Date(dateString)
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-// Polling pesan baru
-const fetchMessages = async () => {
+const fetchProjectDetail = async () => {
   try {
-    const response = await projectService.getMessages(projectId, lastMessageId.value)
-    const newMessages = response.data
-    
-    if (newMessages.length > 0) {
-      messages.value.push(...newMessages)
-      lastMessageId.value = newMessages[newMessages.length - 1].id
-      scrollToBottom()
-    }
-  } catch (err) {
-    console.error('Polling error:', err)
-  }
-}
-
-// Kirim pesan baru
-const handleSendMessage = async () => {
-  if (!newMessage.value.trim() || isSending.value) return
-
-  const messageText = newMessage.value
-  newMessage.value = '' 
-  isSending.value = true
-
-  try {
-    // 1. Kirim ke server
-    await projectService.sendMessage(projectId, messageText)
-    
-    // 2. JANGAN push manual di sini. 
-    // Langsung panggil fetchMessages untuk mengambil data resmi dari server
-    await fetchMessages() 
-    
-  } catch (err) {
-    console.error(err)
-    alert('Gagal mengirim pesan.')
-    newMessage.value = messageText 
+    loading.value = true;
+    const response = await apiClient.get(`/projects/${route.params.id}`);
+    project.value = response.data.data;
+  } catch (error) {
+    console.error("Gagal mengambil data:", error);
   } finally {
-    isSending.value = false
+    loading.value = false;
   }
-}
-onMounted(() => {
-  fetchMessages()
-  // Polling setiap 3 detik (bisa diatur sesuai beban server)
-  pollInterval = setInterval(fetchMessages, 3000)
-})
+};
 
-onUnmounted(() => {
-  if (pollInterval) clearInterval(pollInterval)
-})
+onMounted(fetchProjectDetail);
 </script>
 
 <style scoped>
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 10px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
-
-/* Animasi gelembung chat baru */
-.flex-grow > div {
-  animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+.animate-slide-up { animation: slideUp 0.4s ease-out; }
+@keyframes slideUp { from { transform: translateY(15px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 </style>
