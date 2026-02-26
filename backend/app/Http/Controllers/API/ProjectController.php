@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Response;
 use App\Models\Post;
+use App\Models\ProjectChat;
 class ProjectController extends Controller
 {
     /**
@@ -246,4 +247,24 @@ $post = Post::create([
 
 return response()->json(['success' => true, 'data' => $post], 201);
 }
+
+ public function getChats($id){
+    $chat = ProjectChat::where('project_id', $id)->with('user')->oldest()->get();
+    return response()->json($chat);
+ }
+
+ public function storeChat(Request $request, $id){
+    $request->validate([
+        'message' => 'required|string',
+    ]);
+
+    $chat = ProjectChat::create([
+        'project_id' => $id,
+        'user_id' => $request->user()->id,
+        'message' => $request->message,
+    ]);
+
+    return response()->json($chat->load('user'), 201);
+}
+
 }

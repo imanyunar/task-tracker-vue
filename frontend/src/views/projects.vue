@@ -88,15 +88,8 @@
           <div class="flex items-center justify-between pt-4 border-t border-slate-700/50">
             <div class="flex items-center gap-3 min-w-0">
               <button @click="openDetails(project)" class="text-sm font-bold text-indigo-400 hover:text-indigo-300 transition-colors whitespace-nowrap shrink-0">
-                Opsi & Info &rarr;
+                Detail Project
               </button>
-
-              <router-link :to="{ name: 'ProjectChat', params: { id: project.id } }" class="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-                Chat
-              </router-link>
             </div>
 
             <div v-if="project.my_role_id <= 2 || user?.role_id === 1" class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
