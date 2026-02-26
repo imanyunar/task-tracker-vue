@@ -14,16 +14,23 @@ class TaskController extends Controller
     {
         $user = $request->user();
         $query = Task::with(['project', 'user']);
-        if ($user->role_id == 3) {
-            $tasks = $query->whereHas('project.members', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })->get();
-        } else {
-            $tasks = $query->get();
+
+        // Jika bukan Super Admin / Admin Global
+        if (!in_array($user->role_id, [1, 2])) {
+            $query->where(function ($q) use ($user) {
+                // 1. Lihat tugas yang memang ditugaskan ke saya
+                $q->where('user_id', $user->id)
+                // 2. ATAU lihat semua tugas di proyek di mana saya adalah Owner atau Manager
+                ->orWhereHas('project.members', function ($join) use ($user) {
+                    $join->where('user_id', $user->id)
+                         ->whereIn('role_in_project', [1, 2]); // 1: Owner, 2: Manager
+                });
+            });
         }
+
+        $tasks = $query->latest()->get();
         return response()->json($tasks, 200);
     }
-
     public function store(Request $request)
     {
         $user = $request->user();
