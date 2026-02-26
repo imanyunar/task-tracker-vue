@@ -58,28 +58,34 @@ class TaskController extends Controller
     }
 
     public function update(Request $request, $id)
-    {
-        $user = $request->user();
-        $task = Task::findOrFail($id);
-        if ($user->role_id == 3) {
-            $isMember = $task->project->members()->where('user_id', $user->id)->exists();
-            if (!$isMember) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Akses ditolak'
-                ], 403);
-            }
-            $task->update($request->only('status'));
-        } else {
-            $task->update($request->all());
-        }
+{
+    $user = $request->user();
+    $task = Task::with('project.members')->findOrFail($id);
+    
+    $member = $task->project->members()->where('user_id', $user->id)->first();
+    $roleInProject = $member ? $member->pivot->role_in_project : null;
+
+    // Cek apakah dia Stakeholder (4)
+    if ($roleInProject == 4 && $user->role_id > 2) {
         return response()->json([
-            'success' => true,
-            'message' => 'Tugas Berhasil Diperbarui',
-            'task' => $task
-        ], 200);
+            'success' => false,
+            'message' => 'Stakeholder hanya memiliki akses baca (read-only).'
+        ], 403);
     }
 
+    // Logika untuk Owner (1) dan Manager (2) yang boleh edit semua
+    if ($user->role_id <= 2 || in_array($roleInProject, [1, 2])) {
+        $task->update($request->all());
+    } 
+    // Logika untuk Contributor (3) yang hanya boleh update status tugasnya sendiri
+    else if ($task->user_id === $user->id) {
+        $task->update($request->only('status'));
+    } else {
+        return response()->json(['message' => 'Akses ditolak'], 403);
+    }
+
+    return response()->json(['success' => true, 'task' => $task]);
+}
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
@@ -183,7 +189,7 @@ class TaskController extends Controller
 
     public function show($id)
     {
-        $task = Task::with('project', 'user.department')->findOrFail($id);
+        $task = Task::with(['project.members', 'user.department'])->findOrFail($id);
         return response()->json([
             'success' => true,
             'data' => $task,

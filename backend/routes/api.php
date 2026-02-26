@@ -58,6 +58,10 @@ Route::middleware('auth.manual')->group(function () {
     // Dashboard Stats (KPI)
     Route::get('/dashboard-stats', [TaskController::class, 'getDashboardStats']);
     
+    //Tasks Specific Actions
+    Route::get('/tasks/search', [TaskController::class, 'search']);
+    Route::get('/tasks/status/{status}', [TaskController::class, 'tasksByStatus']);
+    Route::get('/tasks/{id}', [TaskController::class, 'show']);
     // Project Specific Actions
     Route::get('/projects/search', [ProjectController::class, 'search']);
     Route::get('/projects/{projectId}/chats', [ChatController::class, 'index']);
