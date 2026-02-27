@@ -29,8 +29,8 @@
           <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
             <div>
               <div class="inline-flex items-center gap-2 mb-4">
-                <span :class="['px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] border backdrop-blur-md', getRoleClass(projectRole)]">
-                  {{ getRoleLabel(projectRole) }}
+                <span :class="['px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] border backdrop-blur-md', currentRoleClass]">
+                  {{ currentRoleLabel }}
                 </span>
                 <span class="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] border bg-white/5 border-white/10 text-white/50">
                   {{ project.members?.length || 0 }} Anggota
@@ -133,6 +133,7 @@
                 </div>
               </div>
               <button v-if="canManageProject || post.user_id === currentUser.id"
+                @click="deletePost(post.id)"
                 class="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-rose-500 transition-all p-2 rounded-lg hover:bg-rose-500/10">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="1.5" stroke-linecap="round"/></svg>
               </button>
@@ -161,7 +162,7 @@
                 </div>
               </div>
             </div>
-            <div v-if="canPostContent" class="p-4 bg-slate-950/80 border-t border-slate-800 flex gap-3 items-center">
+            <div v-if="canChat" class="p-4 bg-slate-950/80 border-t border-slate-800 flex gap-3 items-center">
               <input v-model="newChatMessage" @keyup.enter="sendChatMessage"
                 placeholder="Ketik pesan..."
                 class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-5 py-3.5 text-sm text-white focus:ring-2 focus:ring-violet-500/50 outline-none placeholder-slate-600 transition-all" />
@@ -183,7 +184,7 @@
               <h3 class="text-white font-black text-xl italic">Daftar Tugas</h3>
               <p class="text-xs text-slate-500 mt-1">{{ project.tasks?.length || 0 }} tugas dalam proyek ini</p>
             </div>
-            <button v-if="canManageProject"
+            <button v-if="canManageProject" @click="openTaskModal"
               class="bg-violet-600 hover:bg-violet-500 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-900/40 flex items-center gap-2">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
               Tambah Tugas
@@ -225,16 +226,31 @@
 
         <!-- PEOPLE -->
         <div v-if="currentTab === 'people'" class="animate-slide-up">
-          <div class="flex items-center justify-between mb-8">
-            <div>
-              <h3 class="text-white text-xl font-black italic">Anggota Tim</h3>
-              <p class="text-slate-500 text-xs mt-1 uppercase tracking-widest font-bold">{{ project.members?.length || 0 }} Orang</p>
+          <div class="mb-6">
+            <h3 class="text-white text-xl font-black italic">Anggota Tim</h3>
+            <p class="text-slate-500 text-xs mt-1 uppercase tracking-widest font-bold">{{ project.members?.length || 0 }} Orang</p>
+          </div>
+
+          <!-- Form Undang Anggota -->
+          <div v-if="canManageProject" class="mb-6 p-5 bg-slate-900/60 border border-slate-800 rounded-2xl">
+            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Undang Anggota Baru</p>
+            <div class="flex flex-col sm:flex-row gap-3">
+              <select v-model.number="newMemberId"
+                class="flex-1 px-3 py-2.5 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none transition-all">
+                <option value="" disabled>Pilih User...</option>
+                <option v-for="u in availableUsers" :key="u.id" :value="u.id">{{ u.name }} ({{ u.email }})</option>
+              </select>
+              <select v-model.number="newMemberRole"
+                class="w-full sm:w-44 px-3 py-2.5 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none transition-all">
+                <option :value="2">Manager</option>
+                <option :value="3">Contributor</option>
+                <option :value="4">Stakeholder</option>
+              </select>
+              <button @click="addMember" :disabled="!newMemberId || isAddingMember"
+                class="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-900/40 whitespace-nowrap">
+                {{ isAddingMember ? 'Memproses...' : 'Tambahkan' }}
+              </button>
             </div>
-            <button v-if="canManageProject"
-              class="bg-violet-600/10 hover:bg-violet-600 text-violet-400 hover:text-white border border-violet-500/20 hover:border-violet-500 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
-              Undang Anggota
-            </button>
           </div>
 
           <div class="grid gap-3">
@@ -255,10 +271,11 @@
                 </div>
               </div>
               <div class="flex items-center gap-3">
-                <span :class="['px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border', getRoleClass(getMemberRoleName(member))]">
+                <span :class="['px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border', getMemberRoleClass(member)]">
                   {{ getMemberRoleName(member) }}
                 </span>
                 <button v-if="canManageProject && member.id !== currentUser.id"
+                  @click="removeMember(member.id)"
                   class="opacity-0 group-hover:opacity-100 text-slate-700 hover:text-rose-500 transition-all p-2 rounded-lg hover:bg-rose-500/10">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                 </button>
@@ -277,167 +294,161 @@
       <button @click="$router.push('/projects')" class="text-violet-400 hover:text-violet-300 text-xs font-bold transition-colors">Kembali ke daftar proyek</button>
     </div>
 
+    <!-- ===== MODAL BUAT TUGAS ===== -->
+    <Teleport to="body">
+      <div v-if="showTaskModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="closeTaskModal">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+        <div class="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-slide-up max-h-[92vh] overflow-y-auto task-modal-scroll">
+          
+          <!-- Header -->
+          <div class="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/5">
+            <div>
+              <h3 class="text-xl font-bold text-white">Tugas Baru</h3>
+              <p class="text-xs text-slate-400 mt-1">Lengkapi informasi detail tugas di bawah ini.</p>
+            </div>
+            <button @click="closeTaskModal" class="p-2 text-slate-500 hover:text-white hover:bg-white/10 rounded-full transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="p-6">
+            <form @submit.prevent="saveTask" class="space-y-6">
+
+              <!-- Informasi Utama -->
+              <div class="space-y-4">
+                <label class="text-violet-400 text-[10px] uppercase tracking-widest font-black block">Informasi Utama</label>
+                <input
+                  v-model="taskForm.title"
+                  type="text"
+                  placeholder="Judul Tugas..."
+                  required
+                  class="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-white placeholder-slate-600 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all"
+                />
+                <textarea
+                  v-model="taskForm.description"
+                  rows="3"
+                  placeholder="Tambahkan deskripsi detail di sini..."
+                  class="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-white placeholder-slate-600 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all resize-none"
+                ></textarea>
+              </div>
+
+              <!-- Detail & Waktu -->
+              <div class="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-4">
+                <label class="text-violet-400 text-[10px] uppercase tracking-widest font-black block">Detail & Waktu</label>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-[11px] text-slate-500 font-bold block mb-1.5 ml-1">Prioritas</label>
+                    <select v-model="taskForm.priority" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none transition-all">
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="text-[11px] text-slate-500 font-bold block mb-1.5 ml-1">Status</label>
+                    <select v-model="taskForm.status" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none transition-all">
+                      <option value="todo">To Do</option>
+                      <option value="doing">Doing</option>
+                      <option value="review">Review</option>
+                      <option value="done">Done</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label class="text-[11px] text-slate-500 font-bold block mb-1.5 ml-1">Tenggat Waktu</label>
+                  <input
+                    v-model="taskForm.due_date"
+                    type="datetime-local"
+                    required
+                    class="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all"
+                  />
+                </div>
+              </div>
+
+              <!-- Assignee -->
+              <div>
+                <label class="text-violet-400 text-[10px] uppercase tracking-widest font-black block mb-3">Penugasan</label>
+                <div>
+                  <label class="text-[11px] text-slate-500 font-bold block mb-1.5 ml-1">Assign To</label>
+                  <select v-model.number="taskForm.user_id" required class="w-full px-3 py-2.5 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none transition-all">
+                    <option value="" disabled>Pilih Anggota</option>
+                    <option v-for="member in project?.members" :key="member.id" :value="member.id">{{ member.name }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div class="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
+                <button type="button" @click="closeTaskModal"
+                  class="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                  Batal
+                </button>
+                <button type="submit" :disabled="isSubmittingTask"
+                  class="px-8 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold shadow-lg shadow-violet-600/20 active:scale-95 transition-all">
+                  {{ isSubmittingTask ? 'Menyimpan...' : 'Simpan Tugas' }}
+                </button>
+              </div>
+
+            </form>
+          </div>
+
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
+
 <script setup>
-import { ref, onMounted, computed, nextTick, onUnmounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import apiClient from '../services/api';
+import { useProjectDetail } from '@/composables/useProjectDetail'
 
-const route = useRoute();
-const router = useRouter();
-const project = ref(null);
-const loading = ref(true);
-const currentTab = ref('stream');
-const isEditingProject = ref(false);
-
-const newMessage = ref('');
-const isSubmitting = ref(false);
-const newChatMessage = ref('');
-const chatMessages = ref([]);
-const chatContainer = ref(null);
-let chatInterval = null;
-
-const tabs = [
-  { key: 'stream', label: 'Forum', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
-  { key: 'chat', label: 'Diskusi', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z' },
-  { key: 'tasks', label: 'Tugas', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
-  { key: 'people', label: 'Tim', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
-];
-
-// ===== AUTH & ROLE — FIXED: gunakan 'user_data' sesuai auth.ts =====
-const currentUser = computed(() => {
-  const keys = ['user_data', 'user', 'current_user', 'auth_user', 'userData'];
-  for (const key of keys) {
-    const raw = sessionStorage.getItem(key);
-    if (raw) {
-      try { return JSON.parse(raw); } catch { continue; }
-    }
-  }
-  return {};
-});
-
-const globalRole = computed(() => {
-  const user = currentUser.value;
-  const roleId = user?.role_id ?? user?.role?.id;
-  return roleId !== undefined ? parseInt(roleId) : 99;
-});
-
-const projectRole = computed(() => {
-  if (globalRole.value === 1 || globalRole.value === 2) return 'admin';
-  if (!project.value?.members) return 'none';
-  const member = project.value.members.find(m => m.id === currentUser.value.id);
-  const roleId = member?.pivot?.role_in_project;
-  const mapping = { 1: 'owner', 2: 'manager', 3: 'contributor', 4: 'stakeholder' };
-  return mapping[roleId] || 'none';
-});
-
-const canManageProject = computed(() => ['admin', 'owner', 'manager'].includes(projectRole.value));
-const canDeleteProject = computed(() => ['admin', 'owner'].includes(projectRole.value));
-const canPostContent = computed(() => !['stakeholder', 'none'].includes(projectRole.value));
-
-// Task progress stats
-const totalTaskCount = computed(() => project.value?.tasks?.length || 0);
-const doneTaskCount = computed(() => project.value?.tasks?.filter(t => t.status === 'done').length || 0);
-const taskProgressPercent = computed(() => {
-  if (!totalTaskCount.value) return 0;
-  return Math.round((doneTaskCount.value / totalTaskCount.value) * 100);
-});
-
-const getMemberRoleName = (member) => {
-  const rId = member.pivot?.role_in_project || member.role_in_project;
-  const mapping = { 1: 'Owner', 2: 'Manager', 3: 'Contributor', 4: 'Stakeholder' };
-  return mapping[rId] || 'Member';
-};
-
-const getRoleLabel = (role) => {
-  const labels = { admin: 'Admin', owner: 'Owner', manager: 'Manager', contributor: 'Contributor', stakeholder: 'Stakeholder', none: 'Pengunjung' };
-  return labels[role] || role;
-};
-
-const getRoleClass = (role) => {
-  const colors = {
-    admin: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
-    owner: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    Owner: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    manager: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
-    Manager: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
-    contributor: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-    Contributor: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-    stakeholder: 'bg-slate-700/30 text-slate-400 border-slate-700',
-    Stakeholder: 'bg-slate-700/30 text-slate-400 border-slate-700',
-    none: 'bg-slate-800 text-slate-500 border-slate-700',
-  };
-  return colors[role] || 'bg-slate-800 text-slate-500 border-slate-700';
-};
-
-const fetchProjectDetail = async () => {
-  try {
-    loading.value = true;
-    const res = await apiClient.get(`/projects/${route.params.id}`);
-    project.value = res.data.data;
-    await fetchChatMessages();
-  } catch (err) {
-    console.error(err);
-    router.push('/projects');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const postToStream = async () => {
-  if (!newMessage.value.trim()) return;
-  try {
-    isSubmitting.value = true;
-    const res = await apiClient.post(`/projects/${route.params.id}/posts`, { content: newMessage.value });
-    if (!project.value.posts) project.value.posts = [];
-    project.value.posts.unshift(res.data.data);
-    newMessage.value = '';
-  } catch (err) { alert('Gagal kirim postingan'); }
-  finally { isSubmitting.value = false; }
-};
-
-const fetchChatMessages = async () => {
-  try {
-    const res = await apiClient.get(`/projects/${route.params.id}/chats`);
-    chatMessages.value = res.data;
-    if (currentTab.value === 'chat') scrollToBottom();
-  } catch (err) { console.warn('Chat error'); }
-};
-
-const sendChatMessage = async () => {
-  if (!newChatMessage.value.trim()) return;
-  const msg = newChatMessage.value;
-  newChatMessage.value = '';
-  try {
-    const res = await apiClient.post(`/projects/${route.params.id}/chats`, { message: msg });
-    chatMessages.value.push(res.data);
-    scrollToBottom();
-  } catch (err) { newChatMessage.value = msg; }
-};
-
-const handleDeleteProject = async () => {
-  if (!confirm('Hapus seluruh proyek ini? Tindakan ini tidak dapat dibatalkan.')) return;
-  try {
-    await apiClient.delete(`/projects/${route.params.id}`);
-    router.push('/projects');
-  } catch (err) { alert('Gagal menghapus proyek.'); }
-};
-
-const scrollToBottom = () => {
-  nextTick(() => { if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight; });
-};
-
-const formatDate = (d) => d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-const formatTime = (d) => d ? new Date(d).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
-
-onMounted(() => {
-  fetchProjectDetail();
-  chatInterval = setInterval(fetchChatMessages, 4000);
-});
-onUnmounted(() => { if (chatInterval) clearInterval(chatInterval); });
+const {
+  project,
+  loading,
+  currentTab,
+  isEditingProject,
+  newMessage,
+  isSubmitting,
+  newChatMessage,
+  chatMessages,
+  chatContainer,
+  currentUser,
+  canManageProject,
+  canDeleteProject,
+  canPostContent,
+  canChat,
+  totalTaskCount,
+  doneTaskCount,
+  taskProgressPercent,
+  tabs,
+  formatDate,
+  formatTime,
+  getMemberRoleName,
+  getMemberRoleClass,
+  currentRoleLabel,
+  currentRoleClass,
+  postToStream,
+  deletePost,
+  sendChatMessage,
+  handleDeleteProject,
+  removeMember,
+  availableUsers,
+  newMemberId,
+  newMemberRole,
+  isAddingMember,
+  addMember,
+  showTaskModal,
+  isSubmittingTask,
+  taskForm,
+  openTaskModal,
+  closeTaskModal,
+  saveTask
+} = useProjectDetail()
 </script>
+
 
 <style scoped>
 .animate-slide-up {
@@ -451,4 +462,6 @@ onUnmounted(() => { if (chatInterval) clearInterval(chatInterval); });
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #4c1d95; border-radius: 10px; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+.task-modal-scroll::-webkit-scrollbar { width: 4px; }
+.task-modal-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
 </style>
