@@ -108,98 +108,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, nextTick } from 'vue';
-import { useRoute } from 'vue-router';
-import apiClient from '../services/api';
-import { projectService } from '../services';
+import { useProjectChat } from '../composables/useProjectChat'
 
-const route = useRoute();
-const project = ref(null);
-const loading = ref(true);
-const isSubmitting = ref(false);
-const currentTab = ref('forum');
-
-// Forum State
-const newPostContent = ref('');
-
-// Chat State
-const chatMessages = ref([]);
-const newChatMessage = ref('');
-const chatContainer = ref(null);
-
-// Auth Data
-const currentUser = JSON.parse(sessionStorage.getItem('user_data') || '{}');
-
-// Computed Roles
-const managers = computed(() => project.value?.members?.filter(m => m.pivot?.role_in_project <= 2) || []);
-
-const fetchProjectDetail = async () => {
-  try {
-    loading.value = true;
-    const response = await apiClient.get(`/projects/${route.params.id}`);
-    project.value = response.data.data;
-  } catch (error) {
-    console.error("Gagal load project:", error);
-  } finally {
-    loading.value = false;
-  }
-};
-
-const handleSendPost = async () => {
-  if (!newPostContent.value.trim()) return;
-  try {
-    isSubmitting.value = true;
-    const res = await apiClient.post(`/projects/${route.params.id}/posts`, {
-      content: newPostContent.value
-    });
-    project.value.posts.unshift(res.data.data);
-    newPostContent.value = '';
-  } catch (error) {
-    alert("Gagal memposting ke forum");
-  } finally {
-    isSubmitting.value = false;
-  }
-};
-
-const loadChats = async () => {
-  try {
-    const res = await projectService.getMessages(route.params.id);
-    chatMessages.value = res.data;
-    scrollToBottom();
-  } catch (err) {
-    console.error("Gagal load chat:", err);
-  }
-};
-
-const handleSendChat = async () => {
-  if (!newChatMessage.value.trim()) return;
-  try {
-    const res = await projectService.sendMessage(route.params.id, newChatMessage.value);
-    chatMessages.value.push(res.data);
-    newChatMessage.value = '';
-    scrollToBottom();
-  } catch (err) {
-    console.error("Gagal kirim chat:", err);
-  }
-};
-
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (chatContainer.value) {
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
-    }
-  });
-};
-
-watch(currentTab, (newTab) => {
-  if (newTab === 'chat') {
-    loadChats();
-  }
-});
-
-onMounted(() => {
-  fetchProjectDetail();
-});
+const {
+  project,
+  loading,
+  isSubmitting,
+  currentTab,
+  newPostContent,
+  chatMessages,
+  newChatMessage,
+  chatContainer,
+  currentUser,
+  managers,
+  handleSendPost,
+  handleSendChat,
+} = useProjectChat()
 </script>
 
 <style scoped>
