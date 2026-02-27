@@ -1,163 +1,354 @@
-import { ref, Ref, computed } from 'vue'
-import { projectService } from '../services'
+import { ref, computed, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+import { useProjectStore } from '../stores/project'
+import apiClient from '../services/api'
 
-// PERUBAHAN 1: Update Interface Project agar mendukung sistem Role
+// ===== TYPES =====
 export interface Project {
   id: number
   name: string
   description: string
-  progress: number      // Sekarang wajib karena dikirim dari backend
-  my_role_id: number    // DATA KRUSIAL: Menentukan hak akses user di proyek ini
-  status: string        // Tambahkan status
-  start_date?: string
-  end_date?: string
+  progress: number
+  status?: 'planned' | 'on_progress' | 'completed'
+  my_role_id: number
   created_by: number
   created_at: string
   updated_at: string
+  start_date?: string
+  end_date?: string
+  department_id?: number
+  department?: { id: number; name: string }
+  members?: Member[]
+  tasks?: Task[]
 }
 
-interface PaginationMeta {
-  current_page: number
-  last_page: number
-  total: number
+export interface Member {
+  id: number
+  name: string
+  email: string
+  pivot?: {
+    role_in_project: number
+  }
 }
 
-interface UseProjectsReturn {
-  projects: Ref<Project[]>
-  loading: Ref<boolean>
-  error: Ref<string>
-  pagination: Ref<PaginationMeta | null>
-  hasMore: Ref<boolean>
-  fetchProjects: (page?: number) => Promise<void>
-  loadMore: () => Promise<void>
-  createProject: (projectData: Partial<Project>) => Promise<any>
-  updateProject: (id: number, projectData: Partial<Project>) => Promise<any>
-  deleteProject: (id: number) => Promise<void>
-  getProjectById: (id: number) => Promise<any>
-  searchProjects: (query: string) => Promise<any>
+export interface Task {
+  id: number
+  name?: string
+  title?: string
+  status: string
+  project_id: number
+  user?: { name: string }
 }
 
-export const useProjects = (): UseProjectsReturn => {
-  const projects = ref<Project[]>([])
-  const pagination = ref<PaginationMeta | null>(null)
+export interface Department {
+  id: number
+  name: string
+}
+
+export interface User {
+  id: number
+  name: string
+  email: string
+  role_id: number
+  dept_id: number
+  department?: { id: number; name: string }
+}
+
+export interface FormData {
+  id: number | undefined
+  name: string
+  description: string
+  start_date: string
+  end_date: string
+  status: 'planned' | 'on_progress' | 'completed'
+  department_id: number | undefined
+}
+
+// ===== CONFIGS =====
+export const roleConfig: Record<number, { label: string; class: string }> = {
+  1: { label: 'Owner',       class: 'text-rose-400 border-rose-500/30 bg-rose-500/10' },
+  2: { label: 'Manager',     class: 'text-blue-400 border-blue-500/30 bg-blue-500/10' },
+  3: { label: 'Contributor', class: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' },
+  4: { label: 'Stakeholder', class: 'text-slate-400 border-slate-600 bg-slate-800/50' },
+}
+
+export const statusConfig: Record<string, { label: string; class: string }> = {
+  planned:     { label: 'Planned',     class: 'bg-slate-700/40 text-slate-300 border-slate-600' },
+  on_progress: { label: 'On Progress', class: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },
+  completed:   { label: 'Completed',   class: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+}
+
+export const STATUS_KEYS = ['planned', 'on_progress', 'completed'] as const
+
+// ===== COMPOSABLE =====
+export function useProjects() {
+  const authStore = useAuthStore()
+  const projectStore = useProjectStore()
+  const router = useRouter()
+
+  // ===== STATE =====
   const loading = ref(false)
-  const error = ref('')
+  const searchQuery = ref('')
+  const currentPage = ref(1)
+  const departments = ref<Department[]>([])
 
-  const hasMore = computed(() => {
-    if (!pagination.value) return false
-    return pagination.value.current_page < pagination.value.last_page
+  // Modal create/edit
+  const showModal = ref(false)
+  const isEditing = ref(false)
+  const isSubmitting = ref(false)
+  const formData = reactive<FormData>({
+    id: undefined,
+    name: '',
+    description: '',
+    start_date: '',
+    end_date: '',
+    status: 'planned',
+    department_id: undefined,
   })
 
-  const fetchProjects = async (page = 1) => {
-    loading.value = true
-    error.value = ''
-    try {
-      const response = await projectService.getAllProjects(page)
-      const rawData = response.data as any
-      
-      const dataItems = rawData.data || []
-      
-      if (page === 1) {
-        projects.value = dataItems
-      } else {
-        projects.value = [...projects.value, ...dataItems]
-      }
+  // Modal detail
+  const showDetailsModal = ref(false)
+  const activeTab = ref<'tasks' | 'members'>('tasks')
+  const selectedProject = ref<Project | null>(null)
+  const projectTasks = ref<Task[]>([])
+  const projectMembers = ref<Member[]>([])
 
-      pagination.value = {
-        current_page: rawData.current_page,
-        last_page: rawData.last_page,
-        total: rawData.total
-      }
-    } catch (err: any) {
-      error.value = 'Gagal mengambil daftar proyek'
-      console.error('Error fetching projects:', err)
+  // Member management
+  const availableUsers = ref<User[]>([])
+  const newMemberId = ref<number | ''>('')
+  const newMemberRole = ref<number>(3)
+  const isAddingMember = ref(false)
+
+  // ===== COMPUTED =====
+  const user = computed(() => authStore.user as User | null)
+  const projects = computed<Project[]>(() => (projectStore.projects as Project[]) || [])
+  const canManageGlobal = computed(() => user.value?.role_id === 1 || user.value?.role_id === 2)
+
+  // Pagination: gunakan type assertion karena store mungkin tidak expose pagination di TypeScript
+  const pagination = computed(() => (projectStore as unknown as { pagination?: { current_page: number; last_page: number } }).pagination)
+  const hasMore = computed(() => (pagination.value?.current_page ?? 0) < (pagination.value?.last_page ?? 0))
+
+  const filteredProjects = computed<Project[]>(() =>
+    projects.value.filter(p =>
+      p.name?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      p.description?.toLowerCase().includes(searchQuery.value.toLowerCase())
+    )
+  )
+
+  const completedCount = computed(() => filteredProjects.value.filter(p => p.status === 'completed').length)
+  const activeCount = computed(() => filteredProjects.value.filter(p => p.status === 'on_progress').length)
+  const plannedCount = computed(() => filteredProjects.value.filter(p => p.status === 'planned' || !p.status).length)
+
+  // ===== LIFECYCLE =====
+  onMounted(async () => {
+    await loadProjects(1)
+    if (canManageGlobal.value) {
+      loadAllUsers()
+      loadDepartments()
+    }
+  })
+
+  // ===== METHODS: DATA FETCHING =====
+  const loadProjects = async (page = 1) => {
+    loading.value = true
+    try {
+      await projectStore.fetchProjects(page)
+      currentPage.value = page
+    } catch (err) {
+      console.error('Fetch Error:', err)
     } finally {
       loading.value = false
     }
   }
 
+  const loadDepartments = async () => {
+    if (user.value?.role_id !== 1) return
+    try {
+      const res = await apiClient.get('/departments')
+      departments.value = res.data.data || res.data || []
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const loadAllUsers = async () => {
+    try {
+      const res = await apiClient.get('/users')
+      availableUsers.value = res.data.data || res.data || []
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   const loadMore = async () => {
-    if (hasMore.value && !loading.value) {
-      const nextPage = (pagination.value?.current_page || 1) + 1
-      await fetchProjects(nextPage)
-    }
+    if (hasMore.value && !loading.value) await loadProjects(currentPage.value + 1)
   }
 
-  const createProject = async (projectData: Partial<Project>) => {
-    try {
-      const response = await projectService.createProject(projectData)
-      const data = (response.data as any).data || response.data
-      
-      // PERUBAHAN 2: Unshift agar proyek baru muncul paling atas dengan role Owner
-      projects.value.unshift(data)
-      return data
-    } catch (err: any) {
-      error.value = err.response?.data?.message || 'Gagal membuat project'
-      throw err
-    }
+  // ===== METHODS: MODAL CREATE/EDIT =====
+  const openCreateModal = () => {
+    isEditing.value = false
+    Object.assign(formData, {
+      id: undefined,
+      name: '',
+      description: '',
+      start_date: '',
+      end_date: '',
+      status: 'planned',
+      department_id: user.value?.role_id === 1 ? undefined : user.value?.dept_id,
+    })
+    showModal.value = true
   }
 
-  const updateProject = async (id: number, projectData: Partial<Project>) => {
+  const openEditModal = (project: Project) => {
+    isEditing.value = true
+    Object.assign(formData, {
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      start_date: project.start_date ? project.start_date.substring(0, 10) : '',
+      end_date: project.end_date ? project.end_date.substring(0, 10) : '',
+      status: project.status ?? 'planned',
+      department_id: project.department_id,
+    })
+    showModal.value = true
+  }
+
+  const closeModal = () => { showModal.value = false }
+
+  const submitProject = async () => {
+    isSubmitting.value = true
     try {
-      const response = await projectService.updateProject(id, projectData)
-      const data = (response.data as any).data || response.data
-      
-      const index = projects.value.findIndex((p) => p.id === id)
-      if (index !== -1) {
-        // PERUBAHAN 3: Memastikan my_role_id tetap ada saat data diupdate
-        projects.value[index] = { ...projects.value[index], ...data }
+      // Buat payload tanpa id: null agar tidak error type
+      const { id, ...payload } = formData
+      if (isEditing.value && id !== undefined) {
+        await projectStore.updateProject(id, payload)
+      } else {
+        await projectStore.createProject(payload)
       }
-      return data
-    } catch (err: any) {
-      error.value = err.response?.data?.message || 'Gagal update project'
-      throw err
+      await loadProjects(1)
+      closeModal()
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } }
+      alert(error.response?.data?.message || 'Gagal memproses data.')
+    } finally {
+      isSubmitting.value = false
     }
   }
 
-  const deleteProject = async (id: number) => {
+  const confirmDelete = async (id: number) => {
+    if (!confirm('Hapus proyek ini secara permanen?')) return
     try {
-      await projectService.deleteProject(id)
-      projects.value = projects.value.filter((p) => p.id !== id)
-    } catch (err: any) {
-      error.value = err.response?.data?.message || 'Gagal hapus project'
-      throw err
+      await projectStore.deleteProject(id)
+      await loadProjects(1)
+    } catch (err) {
+      console.error(err)
+      alert('Gagal menghapus.')
     }
   }
 
-  const getProjectById = async (id: number) => {
+  // ===== METHODS: MODAL DETAIL =====
+  const openDetails = async (project: Project) => {
+    selectedProject.value = project
+    activeTab.value = 'tasks'
+    showDetailsModal.value = true
+    projectTasks.value = []
+    projectMembers.value = []
     try {
-      const response = await projectService.getProjectById(id)
-      return (response.data as any).data || response.data
-    } catch (err: any) {
-      error.value = 'Gagal mengambil detail proyek'
-      throw err
+      const [detailRes, taskRes] = await Promise.all([
+        apiClient.get(`/projects/${project.id}`),
+        apiClient.get('/tasks'),
+      ])
+      const detailData: Project = detailRes.data.data || detailRes.data
+      projectMembers.value = detailData.members || []
+      const allTasks: Task[] = taskRes.data.data || taskRes.data || []
+      projectTasks.value = allTasks.filter((t: Task) => t.project_id === project.id)
+    } catch (err) {
+      console.error(err)
     }
   }
 
-  const searchProjects = async (query: string) => {
+  const closeDetailsModal = () => { showDetailsModal.value = false }
+
+  const goToWorkspace = (projectId: number) => {
+    router.push({ name: 'ProjectDetail', params: { id: String(projectId) } })
+  }
+
+  // ===== METHODS: MEMBER MANAGEMENT =====
+  const addMember = async () => {
+    if (!newMemberId.value || !selectedProject.value) return
+    isAddingMember.value = true
     try {
-      const response = await projectService.searchProjects(query)
-      const data = (response.data as any).data || response.data
-      projects.value = Array.isArray(data) ? data : []
-      return data
-    } catch (err: any) {
-      error.value = 'Gagal mencari proyek'
-      throw err
+      await apiClient.post(`/projects/${selectedProject.value.id}/members`, {
+        user_id: newMemberId.value,
+        role_in_project: Number(newMemberRole.value),
+      })
+      const detailRes = await apiClient.get(`/projects/${selectedProject.value.id}`)
+      const detailData: Project = detailRes.data.data || detailRes.data
+      projectMembers.value = detailData.members || []
+      newMemberId.value = ''
+      alert('Anggota berhasil ditambahkan!')
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } }
+      alert(error.response?.data?.message || 'Gagal menambahkan.')
+    } finally {
+      isAddingMember.value = false
     }
   }
 
+  const removeMember = async (memberId: number) => {
+    if (!confirm('Hapus anggota ini dari proyek?')) return
+    if (!selectedProject.value) return
+    try {
+      await apiClient.delete(`/projects/${selectedProject.value.id}/members/${memberId}`)
+      projectMembers.value = projectMembers.value.filter((m: Member) => m.id !== memberId)
+    } catch (err) {
+      console.error(err)
+      alert('Gagal menghapus anggota.')
+    }
+  }
+
+  // ===== RETURN =====
   return {
-    projects,
+    // State
     loading,
-    error,
-    pagination,
+    searchQuery,
+    departments,
+    showModal,
+    isEditing,
+    isSubmitting,
+    formData,
+    showDetailsModal,
+    activeTab,
+    selectedProject,
+    projectTasks,
+    projectMembers,
+    availableUsers,
+    newMemberId,
+    newMemberRole,
+    isAddingMember,
+
+    // Computed
+    user,
+    projects,
+    canManageGlobal,
     hasMore,
-    fetchProjects,
+    filteredProjects,
+    completedCount,
+    activeCount,
+    plannedCount,
+
+    // Methods
     loadMore,
-    createProject,
-    updateProject,
-    deleteProject,
-    getProjectById,
-    searchProjects,
+    openCreateModal,
+    openEditModal,
+    closeModal,
+    submitProject,
+    confirmDelete,
+    openDetails,
+    closeDetailsModal,
+    goToWorkspace,
+    addMember,
+    removeMember,
   }
 }

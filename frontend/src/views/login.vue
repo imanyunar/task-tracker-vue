@@ -1,139 +1,136 @@
-<script setup>
-import { ref } from 'vue'
-import { useAuthStore } from '../stores/auth'
-import { useRouter } from 'vue-router'
+<script setup lang="ts">
+import { useLogin } from '../composables/useLogin'
 
-const authStore = useAuthStore()
-const router = useRouter()
-
-const email = ref('')
-const password = ref('')
-const loading = ref(false)
-const notification = ref({ show: false, message: '', type: 'error' })
-
-const showNotify = (msg, type = 'error') => {
-  notification.value = { show: true, message: msg, type }
-  setTimeout(() => {
-    notification.value.show = false
-  }, 4000)
-}
-
-const handleLogin = async () => {
-  loading.value = true
-  try {
-    // Tunggu hasil return true dari store
-    const isSuccess = await authStore.login({
-      email: email.value,
-      password: password.value
-    })
-    
-    if (isSuccess) {
-      showNotify('Login berhasil!', 'success')
-      // Gunakan replace agar tidak bisa back ke login
-      router.replace({ name: 'Dashboard' }) 
-    }
-  } catch (err) {
-    showNotify('Email atau password salah', 'error')
-  } finally {
-    loading.value = false
-  }
-}
+const { email, password, loading, notification, handleLogin } = useLogin()
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-    <!-- Animated background blobs -->
-    <div class="fixed inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob"></div>
-      <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-2000"></div>
-      <div class="absolute top-1/2 left-1/2 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-4000"></div>
-    </div>
+  <div class="relative min-h-screen flex items-center justify-center px-4 py-12 overflow-hidden bg-slate-950">
+
+    <!-- Ambient blobs — same as other pages -->
+    <div class="fixed top-0 -left-10 w-[500px] h-[500px] bg-indigo-600/8 rounded-full filter blur-[120px] animate-blob pointer-events-none"></div>
+    <div class="fixed -bottom-20 -right-10 w-[500px] h-[500px] bg-purple-600/8 rounded-full filter blur-[120px] animate-blob animation-delay-2000 pointer-events-none"></div>
+    <div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-indigo-900/10 rounded-full filter blur-[100px] pointer-events-none"></div>
 
     <!-- Notification -->
     <Transition name="slide">
-      <div v-if="notification.show" :class="['fixed top-6 right-6 z-50', notification.type === 'success' ? 'alert-success' : 'alert-danger']">
-        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+      <div
+        v-if="notification.show"
+        :class="[
+          'fixed top-6 right-6 z-50 flex items-start gap-3 px-4 py-3.5 rounded-2xl border shadow-2xl backdrop-blur-xl',
+          notification.type === 'success'
+            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+            : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+        ]"
+      >
+        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
           <path v-if="notification.type === 'success'" fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
           <path v-else fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
         </svg>
         <div>
-          <p class="font-semibold">{{ notification.type === 'success' ? 'Berhasil' : 'Gagal' }}</p>
-          <p class="text-sm opacity-90">{{ notification.message }}</p>
+          <p class="font-bold text-sm">{{ notification.type === 'success' ? 'Berhasil' : 'Gagal' }}</p>
+          <p class="text-xs opacity-80 mt-0.5">{{ notification.message }}</p>
         </div>
       </div>
     </Transition>
 
     <!-- Login Card -->
     <div class="w-full max-w-md relative z-10 animate-slide-up">
-      <div class="card-elevated p-8">
+
+      <!-- Glass card — same as .card in style.css -->
+      <div class="glass rounded-3xl border border-white/5 shadow-2xl p-8 md:p-10">
+
         <!-- Header -->
         <div class="text-center mb-8">
-          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-primary mb-4 shadow-glow-primary">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <!-- Icon -->
+          <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-5 shadow-lg shadow-indigo-900/30">
+            <svg class="w-7 h-7 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
             </svg>
           </div>
-          <h1 class="text-3xl font-bold text-white">TaskTracker</h1>
-          <div class="mt-4 px-4 py-3 rounded-lg" style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);">
-            <p class="text-slate-100 text-sm font-medium">Kelola tugas Anda dengan mudah dan efisien</p>
-          </div>
+
+          <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-tight mt-2 m-0">
+            Selamat <span class="text-gradient-primary">Datang</span>
+          </h1>
+          <p class="text-slate-500 text-sm mt-2 m-0 font-medium">Masuk untuk mengelola tugas dan proyek tim Anda.</p>
         </div>
 
         <!-- Form -->
-        <form @submit.prevent="handleLogin" class="space-y-4">
+        <form @submit.prevent="handleLogin" class="space-y-5">
+
           <div class="form-group">
             <label class="label-field">Email</label>
-            <input
-              v-model="email"
-              type="email"
-              class="input-field"
-              placeholder="nama@example.com"
-              required
-            />
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                </svg>
+              </div>
+              <input
+                v-model="email"
+                type="email"
+                required
+                placeholder="nama@example.com"
+                class="input-field pl-10"
+              />
+            </div>
           </div>
 
           <div class="form-group">
             <label class="label-field">Password</label>
-            <input
-              v-model="password"
-              type="password"
-              class="input-field"
-              placeholder="••••••••"
-              required
-            />
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <input
+                v-model="password"
+                type="password"
+                required
+                placeholder="••••••••"
+                class="input-field pl-10"
+              />
+            </div>
           </div>
 
-          <button type="submit" class="btn-primary w-full mt-6" :disabled="loading">
-            <span v-if="!loading" class="flex items-center justify-center gap-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <!-- Submit -->
+          <button
+            type="submit"
+            :disabled="loading"
+            class="btn btn-primary w-full rounded-xl mt-2 shadow-lg shadow-indigo-500/20 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <template v-if="!loading">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
               </svg>
               Masuk
-            </span>
-            <svg v-else class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            </template>
+            <template v-else>
+              <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              Memproses...
+            </template>
           </button>
         </form>
 
         <!-- Divider -->
         <div class="flex items-center gap-3 my-6">
-          <div class="divider flex-1"></div>
-          <span class="text-xs text-slate-400 uppercase tracking-wide">atau</span>
-          <div class="divider flex-1"></div>
+          <div class="flex-1 h-px bg-slate-800"></div>
+          <span class="text-[10px] text-slate-600 font-black uppercase tracking-widest">atau</span>
+          <div class="flex-1 h-px bg-slate-800"></div>
         </div>
 
-        <!-- Footer -->
-        <p class="text-center text-slate-300 text-sm">
+        <!-- Register link -->
+        <p class="text-center text-slate-500 text-sm m-0">
           Belum punya akun?
-          <router-link to="/register" class="text-primary-300 hover:text-primary-200 font-semibold transition-colors">
+          <router-link to="/register" class="text-indigo-400 hover:text-indigo-300 font-bold transition-colors ml-1">
             Daftar sekarang
           </router-link>
         </p>
       </div>
 
-      <!-- Bottom decoration -->
-      <p class="text-center text-slate-500 text-xs mt-6">
+      <!-- Footer -->
+      <p class="text-center text-slate-600 text-[11px] font-medium mt-6 tracking-wider">
         © 2026 TaskTracker. Semua hak dilindungi.
       </p>
     </div>
@@ -141,42 +138,13 @@ const handleLogin = async () => {
 </template>
 
 <style scoped>
-.animate-blob {
-  animation: blob 7s infinite;
-}
-
-.animation-delay-2000 {
-  animation-delay: 2s;
-}
-
-.animation-delay-4000 {
-  animation-delay: 4s;
-}
-
-@keyframes blob {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(30px, -50px) scale(1.1);
-  }
-  66% {
-    transform: translate(-20px, 20px) scale(0.9);
-  }
-}
-
 .slide-enter-active,
 .slide-leave-active {
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-.slide-enter-from {
-  transform: translateX(100px);
-  opacity: 0;
-}
-
+.slide-enter-from,
 .slide-leave-to {
-  transform: translateX(100px);
+  transform: translateX(110%);
   opacity: 0;
 }
 </style>

@@ -1,92 +1,140 @@
-import { ref, Ref } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
+import { useAuthStore } from '../stores/auth'
 import { taskService } from '../services'
+import type { DashboardStats, Task } from '../services'
 
-interface DashboardStats {
-  total_tasks: number
-  completed_tasks: number
-  pending_tasks: number
-  total_projects: number
-  completion_rate: number
-  timeliness_rate: number
-  kpi_score: number
-}
-
-interface Task {
+// ===== TYPES =====
+export interface DashboardTask {
   id: number
-  name: string
-  description: string
-  project_id: number
-  user_id: number
+  title?: string
+  name?: string
   status: string
-  deadline: string
-  created_at: string
-  updated_at: string
+  due_date?: string
+  deadline?: string
+  user?: { name: string }
 }
 
-interface UseDashboardReturn {
-  stats: Ref<Partial<DashboardStats>>
-  allTasks: Ref<Task[]>
-  loading: Ref<boolean>
-  error: Ref<string>
-  loadDashboard: () => Promise<void>
-  fetchDashboardStats: () => Promise<void>
-  fetchAllTasks: () => Promise<void>
-}
+// ===== COMPOSABLE =====
+export function useDashboardPage() {
+  const authStore = useAuthStore()
 
-export const useDashboard = (): UseDashboardReturn => {
-  const stats = ref<Partial<DashboardStats>>({
-    total_tasks: 0,
-    completed_tasks: 0,
-    pending_tasks: 0,
-    total_projects: 0,
-    completion_rate: 0,
-    timeliness_rate: 0,
-    kpi_score: 0,
+  // ===== STATE =====
+  const stats = ref<DashboardStats | null>(null)
+  const allTasks = ref<DashboardTask[]>([])
+  const loading = ref(false)
+  const isViewAll = ref(false)
+  const currentPage = ref(1)
+  const itemsPerPage = 8
+
+  // ===== CLOCK =====
+  const currentTime = ref(new Date())
+  let timer: ReturnType<typeof setInterval> | null = null
+  const updateClock = () => { currentTime.value = new Date() }
+
+  // ===== COMPUTED =====
+  const user = computed(() => authStore.user)
+
+  const greeting = computed(() => {
+    const h = currentTime.value.getHours()
+    if (h < 11) return 'Selamat Pagi'
+    if (h < 15) return 'Selamat Siang'
+    if (h < 18) return 'Selamat Sore'
+    return 'Selamat Malam'
   })
 
-  const allTasks = ref<Task[]>([])
-  const loading = ref(false)
-  const error = ref('')
+  const timeString = computed(() =>
+    currentTime.value.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  )
 
-  const fetchDashboardStats = async () => {
-    try {
-      const response = await taskService.getDashboardStats()
-      const data = (response.data as any).data || response.data
-      stats.value = data
-    } catch (err: any) {
-      error.value = 'Gagal mengambil statistik dashboard'
-      console.error('Error fetching dashboard stats:', err)
-    }
-  }
+  const dateString = computed(() =>
+    currentTime.value.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  )
 
-  const fetchAllTasks = async () => {
-    try {
-      const tasksResponse = await taskService.getAllTasks()
-      const tasksList = (tasksResponse.data as any).data || tasksResponse.data || []
-      allTasks.value = Array.isArray(tasksList) ? tasksList : []
-    } catch (err: any) {
-      error.value = 'Gagal mengambil daftar tugas'
-      console.error('Error fetching tasks:', err)
-    }
-  }
+  const displayTasks = computed<DashboardTask[]>(() => {
+    if (!isViewAll.value) return allTasks.value.slice(0, 6)
+    const start = (currentPage.value - 1) * itemsPerPage
+    return allTasks.value.slice(start, start + itemsPerPage)
+  })
 
+  const totalPages = computed(() => Math.ceil(allTasks.value.length / itemsPerPage))
+
+  const pendingCount = computed(() => allTasks.value.filter((t: DashboardTask) => t.status === 'todo').length)
+  const doingCount = computed(() => allTasks.value.filter((t: DashboardTask) => t.status === 'doing').length)
+  const doneCount = computed(() => allTasks.value.filter((t: DashboardTask) => t.status === 'done').length)
+
+  // ===== LIFECYCLE =====
   const loadDashboard = async () => {
     loading.value = true
-    error.value = ''
     try {
-      await Promise.all([fetchDashboardStats(), fetchAllTasks()])
+      const [statsRes, tasksRes] = await Promise.all([
+        taskService.getDashboardStats(),
+        taskService.getAllTasks(),
+      ])
+      stats.value = (statsRes.data as any).data || statsRes.data
+      const raw = (tasksRes.data as any).data || tasksRes.data
+      allTasks.value = Array.isArray(raw) ? raw : []
+    } catch (e) {
+      console.error('Gagal memuat dashboard:', e)
     } finally {
       loading.value = false
     }
   }
 
+  onMounted(async () => {
+    timer = setInterval(updateClock, 1000)
+    if (!authStore.user) {
+      try { await authStore.fetchProfile() } catch (e) { console.error('Gagal mengambil profil user:', e) }
+    }
+    await loadDashboard()
+  })
+
+  onUnmounted(() => {
+    if (timer) clearInterval(timer)
+  })
+
+  // ===== METHODS =====
+  const toggleViewAll = () => {
+    isViewAll.value = !isViewAll.value
+    currentPage.value = 1
+  }
+
+  const getStatusConfig = (status: string) => {
+    const s = (status || '').toLowerCase()
+    if (s === 'done' || s === 'selesai') return { color: 'badge-success', label: 'Selesai' }
+    if (s === 'doing' || s === 'proses') return { color: 'badge-primary', label: 'Proses' }
+    if (s === 'review') return { color: 'badge-warning', label: 'Review' }
+    return { color: 'badge-danger', label: s || 'Todo' }
+  }
+
+  const formatDate = (dateStr?: string): string => {
+    if (!dateStr) return '-'
+    return new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  const isOverdue = (dateStr?: string): boolean => {
+    if (!dateStr) return false
+    return new Date(dateStr) < new Date()
+  }
+
+  // ===== RETURN =====
   return {
     stats,
     allTasks,
     loading,
-    error,
-    loadDashboard,
-    fetchDashboardStats,
-    fetchAllTasks,
+    isViewAll,
+    currentPage,
+    user,
+    greeting,
+    timeString,
+    dateString,
+    displayTasks,
+    totalPages,
+    pendingCount,
+    doingCount,
+    doneCount,
+    toggleViewAll,
+    getStatusConfig,
+    formatDate,
+    isOverdue,
   }
 }

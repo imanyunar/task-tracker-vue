@@ -1,82 +1,15 @@
 <script setup>
-import { onMounted, onUnmounted, ref, computed } from 'vue'
-import { useAuthStore } from '../stores/auth'
-import { useDashboard } from '../composables/useDashboard'
+import { useDashboardPage } from '../composables/useDashboard'
+// Pastikan file ini ada di: src/composables/useDashboardPage.ts
 
-const authStore = useAuthStore()
-const { stats, allTasks, loading, loadDashboard } = useDashboard()
-
-const isViewAll = ref(false)
-const currentPage = ref(1)
-const itemsPerPage = 8
-
-const currentTime = ref(new Date())
-let timer = null
-const updateClock = () => { currentTime.value = new Date() }
-
-const user = computed(() => authStore.user)
-
-const greeting = computed(() => {
-  const h = currentTime.value.getHours()
-  if (h < 11) return 'Selamat Pagi'
-  if (h < 15) return 'Selamat Siang'
-  if (h < 18) return 'Selamat Sore'
-  return 'Selamat Malam'
-})
-
-const timeString = computed(() =>
-  currentTime.value.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-)
-
-const dateString = computed(() =>
-  currentTime.value.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-)
-
-onMounted(async () => {
-  timer = setInterval(updateClock, 1000)
-  if (!authStore.user) {
-    try { await authStore.fetchProfile() } catch (e) { console.error('Gagal mengambil profil user:', e) }
-  }
-  await loadDashboard()
-})
-
-onUnmounted(() => { if (timer) clearInterval(timer) })
-
-const displayTasks = computed(() => {
-  const data = allTasks.value || []
-  if (!isViewAll.value) return data.slice(0, 6)
-  const start = (currentPage.value - 1) * itemsPerPage
-  return data.slice(start, start + itemsPerPage)
-})
-
-const totalPages = computed(() => Math.ceil((allTasks.value?.length || 0) / itemsPerPage))
-
-const toggleViewAll = () => {
-  isViewAll.value = !isViewAll.value
-  currentPage.value = 1
-}
-
-const pendingCount = computed(() => (allTasks.value || []).filter(t => t.status === 'todo').length)
-const doingCount = computed(() => (allTasks.value || []).filter(t => t.status === 'doing').length)
-const doneCount = computed(() => (allTasks.value || []).filter(t => t.status === 'done').length)
-
-const getStatusConfig = (status) => {
-  const s = (status || '').toLowerCase()
-  if (s === 'done' || s === 'selesai') return { color: 'badge-success', label: 'Selesai' }
-  if (s === 'doing' || s === 'proses') return { color: 'badge-primary', label: 'Proses' }
-  if (s === 'review') return { color: 'badge-warning', label: 'Review' }
-  return { color: 'badge-danger', label: s || 'Todo' }
-}
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-const isOverdue = (dateStr) => {
-  if (!dateStr) return false
-  return new Date(dateStr) < new Date()
-}
+const {
+  stats, allTasks, loading,
+  isViewAll, currentPage,
+  user, greeting, timeString, dateString,
+  displayTasks, totalPages,
+  pendingCount, doingCount, doneCount,
+  toggleViewAll, getStatusConfig, formatDate, isOverdue,
+} = useDashboardPage()
 </script>
 
 <template>
@@ -106,17 +39,14 @@ const isOverdue = (dateStr) => {
                 </span>
               </div>
               <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight text-white leading-tight m-0">
-                {{ user?.name
-                  ? user.name.split(' ').slice(0, 2).join(' ')
-                  : 'Memuat...' }}
-                <span class="text-gradient-primary">.</span>
+                {{ user?.name ? user.name.split(' ').slice(0, 2).join(' ') : 'Memuat...' }}
+                
               </h1>
               <p class="text-slate-500 text-sm m-0 font-medium capitalize">{{ dateString }}</p>
             </div>
 
-            <!-- Right: Clock + quick stats -->
+            <!-- Right: Clock -->
             <div class="flex flex-wrap items-center gap-4">
-              <!-- Clock -->
               <div class="flex items-center gap-4 bg-slate-950/60 border border-slate-800 rounded-2xl px-5 py-4 shadow-inner min-w-[190px]">
                 <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 flex-shrink-0">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,8 +58,6 @@ const isOverdue = (dateStr) => {
                   <p class="text-white font-mono font-bold text-xl tabular-nums leading-none">{{ timeString }}</p>
                 </div>
               </div>
-
-
             </div>
 
           </div>
@@ -149,7 +77,7 @@ const isOverdue = (dateStr) => {
       <!-- ===== MAIN CONTENT ===== -->
       <div v-else class="space-y-8 animate-fade-in">
 
-        <!-- STAT CARDS (hanya muncul saat tidak view all) -->
+        <!-- STAT CARDS -->
         <section v-if="!isViewAll" class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
 
           <!-- Completion Rate -->
@@ -166,10 +94,8 @@ const isOverdue = (dateStr) => {
               </p>
               <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider m-0">Tugas Selesai</p>
             </div>
-            <!-- Progress bar -->
             <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-800">
-              <div class="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-1000"
-                :style="{ width: (stats?.completion_rate || 0) + '%' }"></div>
+              <div class="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-1000" :style="{ width: (stats?.completion_rate || 0) + '%' }"></div>
             </div>
             <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-emerald-500/5 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
           </div>
@@ -189,8 +115,7 @@ const isOverdue = (dateStr) => {
               <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider m-0">Tepat Waktu</p>
             </div>
             <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-800">
-              <div class="h-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-1000"
-                :style="{ width: (stats?.timeliness_rate || 0) + '%' }"></div>
+              <div class="h-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-1000" :style="{ width: (stats?.timeliness_rate || 0) + '%' }"></div>
             </div>
             <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-amber-500/5 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
           </div>
@@ -250,13 +175,12 @@ const isOverdue = (dateStr) => {
                     </p>
                   </div>
                 </div>
-                <button @click="toggleViewAll"
-                  class="btn-secondary btn-sm rounded-xl text-[10px] font-black tracking-widest uppercase hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all">
+                <button @click="toggleViewAll" class="btn-secondary btn-sm rounded-xl text-[10px] font-black tracking-widest uppercase hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all">
                   {{ isViewAll ? '← Kembali' : 'Lihat Semua' }}
                 </button>
               </div>
 
-              <!-- Task Status Mini Tabs (saat view all) -->
+              <!-- Mini tabs (view all mode) -->
               <div v-if="isViewAll" class="px-6 pt-4 flex flex-wrap gap-2 border-b border-slate-800/50 pb-4">
                 <span class="badge badge-danger">{{ pendingCount }} Todo</span>
                 <span class="badge badge-primary">{{ doingCount }} Doing</span>
@@ -283,9 +207,7 @@ const isOverdue = (dateStr) => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="(task, idx) in displayTasks" :key="task.id"
-                      class="group cursor-pointer"
-                      :style="`animation-delay: ${idx * 40}ms`">
+                    <tr v-for="(task, idx) in displayTasks" :key="task.id" class="group cursor-pointer" :style="`animation-delay: ${idx * 40}ms`">
                       <td class="py-4 px-6">
                         <div class="flex items-center gap-3">
                           <div :class="['w-2 h-2 rounded-full flex-shrink-0',
@@ -307,8 +229,7 @@ const isOverdue = (dateStr) => {
                       </td>
                       <td class="hidden sm:table-cell py-4 px-6">
                         <div v-if="task.user?.name" class="flex items-center gap-2">
-                          <img :src="`https://ui-avatars.com/api/?name=${task.user.name}&background=4f46e5&color=fff&size=24&bold=true`"
-                            class="w-6 h-6 rounded-lg flex-shrink-0">
+                          <img :src="`https://ui-avatars.com/api/?name=${task.user.name}&background=4f46e5&color=fff&size=24&bold=true`" class="w-6 h-6 rounded-lg flex-shrink-0">
                           <span class="text-slate-400 text-xs font-medium truncate max-w-[100px]">{{ task.user.name }}</span>
                         </div>
                         <span v-else class="text-slate-600 text-xs">—</span>
@@ -327,10 +248,8 @@ const isOverdue = (dateStr) => {
               <div v-if="isViewAll && totalPages > 1" class="card-footer">
                 <p class="text-xs text-slate-500 font-medium">Halaman {{ currentPage }} dari {{ totalPages }}</p>
                 <div class="flex gap-2">
-                  <button @click="currentPage > 1 && currentPage--" :disabled="currentPage === 1"
-                    class="btn-secondary btn-sm rounded-lg disabled:opacity-20">← Sebelumnya</button>
-                  <button @click="currentPage < totalPages && currentPage++" :disabled="currentPage === totalPages"
-                    class="btn btn-primary btn-sm rounded-lg disabled:opacity-20">Berikutnya →</button>
+                  <button @click="currentPage > 1 && currentPage--" :disabled="currentPage === 1" class="btn-secondary btn-sm rounded-lg disabled:opacity-20">← Sebelumnya</button>
+                  <button @click="currentPage < totalPages && currentPage++" :disabled="currentPage === totalPages" class="btn btn-primary btn-sm rounded-lg disabled:opacity-20">Berikutnya →</button>
                 </div>
               </div>
             </div>
@@ -351,8 +270,6 @@ const isOverdue = (dateStr) => {
                   </span>
                 </div>
                 <p class="text-[10px] text-slate-600 font-bold uppercase tracking-widest mt-4 m-0">Skor KPI Pribadi</p>
-
-                <!-- dot indicators -->
                 <div class="flex justify-center gap-1.5 mt-5">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-80"></span>
                   <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
@@ -370,7 +287,6 @@ const isOverdue = (dateStr) => {
                 <h3 class="text-sm font-bold text-white m-0">Ringkasan Tugas</h3>
               </div>
               <div class="card-body p-0">
-                <!-- Total -->
                 <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800/50">
                   <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400">
@@ -380,7 +296,6 @@ const isOverdue = (dateStr) => {
                   </div>
                   <span class="text-xl font-black text-white tabular-nums">{{ stats?.total_tasks || 0 }}</span>
                 </div>
-                <!-- Doing -->
                 <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800/50">
                   <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
@@ -390,7 +305,6 @@ const isOverdue = (dateStr) => {
                   </div>
                   <span class="text-xl font-black text-indigo-400 tabular-nums">{{ doingCount }}</span>
                 </div>
-                <!-- Done -->
                 <div class="flex items-center justify-between px-5 py-4">
                   <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
@@ -401,15 +315,13 @@ const isOverdue = (dateStr) => {
                   <span class="text-xl font-black text-emerald-400 tabular-nums">{{ stats?.completed_tasks || 0 }}</span>
                 </div>
               </div>
-              <!-- Progress bar footer -->
               <div class="px-5 pb-5">
                 <div class="flex justify-between text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-2">
                   <span>Progress Keseluruhan</span>
                   <span class="text-indigo-400">{{ stats?.completion_rate || 0 }}%</span>
                 </div>
                 <div class="h-2 rounded-full bg-slate-800 overflow-hidden">
-                  <div class="h-full rounded-full bg-gradient-primary transition-all duration-1000"
-                    :style="{ width: (stats?.completion_rate || 0) + '%' }"></div>
+                  <div class="h-full rounded-full bg-gradient-primary transition-all duration-1000" :style="{ width: (stats?.completion_rate || 0) + '%' }"></div>
                 </div>
               </div>
             </div>
