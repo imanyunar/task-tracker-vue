@@ -1,85 +1,74 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\AuthController;
-use App\Http\Controllers\API\TaskController;
-use App\Http\Controllers\API\UserController;
-use App\Http\Controllers\API\DepartmentController;
-use App\Http\Controllers\API\ProjectController;
-use App\Http\Controllers\API\ProfileController;
-use App\Http\Controllers\API\ChatController;
+use App\Http\Controllers\API\ShowController;
+use App\Http\Controllers\API\CreateController;
+use App\Http\Controllers\API\UpdateController;
+use App\Http\Controllers\API\DeleteController;
 
 // ==========================================
-// PUBLIC ROUTES (Tidak perlu login)
+// PUBLIC ROUTES
 // ==========================================
-Route::get('/login', function () {
-    return response()->file(public_path('login.html'));
-});
+Route::get('/login',    fn() => response()->file(public_path('login.html')));
+Route::get('/register', fn() => response()->file(public_path('register.html')));
 
-Route::get('/register', function () {
-    return response()->file(public_path('register.html'));
-});
-
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
-
+Route::post('/register', [CreateController::class, 'register']);
+Route::post('/login',    [CreateController::class, 'login']);
 
 // ==========================================
-// PROTECTED ROUTES (Wajib login / memiliki token)
+// PROTECTED ROUTES
 // ==========================================
 Route::middleware('auth.manual')->group(function () {
-    
-    // ------------------------------------------
-    // 1. RUTE HTML VIEWS
-    // ------------------------------------------
-    Route::get('/dashboard', function () {
-        return response()->file(public_path('dashboard.vue'));
-    });
-    
-    Route::get('/tasks-view', function () {
-        return response()->file(public_path('tasks.vue'));
-    });
-    
-    Route::get('/projects-view', function () {
-        return response()->file(public_path('projects.vue'));
-    });
 
-    Route::get('/profile-view', function () { 
-        return response()->file(public_path('profile.vue')); 
-    });
+    // --- HTML Views ----------------------------------------------------------
+    Route::get('/dashboard',     fn() => response()->file(public_path('dashboard.vue')));
+    Route::get('/tasks-view',    fn() => response()->file(public_path('tasks.vue')));
+    Route::get('/projects-view', fn() => response()->file(public_path('projects.vue')));
+    Route::get('/profile-view',  fn() => response()->file(public_path('profile.vue')));
 
-    // ------------------------------------------
-    // 2. RUTE SPESIFIK (WAJIB DI ATAS RESOURCE!)
-    // ------------------------------------------
-    // Profile
-    Route::get('/profile', [ProfileController::class, 'show']);
-    Route::put('/profile', [ProfileController::class, 'update']);
-    
-    // Dashboard Stats (KPI)
-    Route::get('/dashboard-stats', [TaskController::class, 'getDashboardStats']);
-    
-    //Tasks Specific Actions
-    Route::get('/tasks/search', [TaskController::class, 'search']);
-    Route::get('/tasks/status/{status}', [TaskController::class, 'tasksByStatus']);
-    Route::get('/tasks/{id}', [TaskController::class, 'show']);
-    // Project Specific Actions
-    Route::get('/projects/search', [ProjectController::class, 'search']);
-    Route::get('/projects/{projectId}/chats', [ChatController::class, 'index']);
-    Route::post('/projects/{projectId}/chats', [ChatController::class, 'store']);
-    Route::post('/projects/{id}/members', [ProjectController::class, 'addMember']);
-    Route::get('/projects/{projectId}/tasks', [TaskController::class, 'tasksByProject']);
-    Route::post('/projects/{id}/posts', [ProjectController::class, 'storePost']);
-    
-    // ------------------------------------------
-    // 3. RUTE RESOURCE (WAJIB DI BAWAH!)
-    // ------------------------------------------
-    Route::apiResource('/departments', DepartmentController::class);
-    Route::apiResource('/users', UserController::class);
-    Route::apiResource('/projects', ProjectController::class);
-    Route::apiResource('/tasks', TaskController::class);
-    
-    // ------------------------------------------
-    // 4. LOGOUT
-    // ------------------------------------------
-    Route::post('/logout', [AuthController::class, 'logout']);
+    // --- Auth ----------------------------------------------------------------
+    Route::post('/logout', [DeleteController::class, 'logout']);
+
+    // --- Profile -------------------------------------------------------------
+    Route::get('/profile', [ShowController::class,   'profileShow']);
+    Route::put('/profile', [UpdateController::class, 'profileUpdate']);
+
+    // --- Department ----------------------------------------------------------
+    Route::get('/departments',         [ShowController::class,   'departmentIndex']);
+    Route::get('/departments/{id}',    [ShowController::class,   'departmentShow']);
+    Route::post('/departments',        [CreateController::class, 'departmentStore']);
+    Route::put('/departments/{id}',    [UpdateController::class, 'departmentUpdate']);
+    Route::delete('/departments/{id}', [DeleteController::class, 'departmentDestroy']);
+
+    // --- User ----------------------------------------------------------------
+    Route::get('/users',         [ShowController::class,   'userIndex']);
+    Route::get('/users/{id}',    [ShowController::class,   'userShow']);
+    Route::post('/users',        [CreateController::class, 'userStore']);
+    Route::put('/users/{id}',    [UpdateController::class, 'userUpdate']);
+    Route::delete('/users/{id}', [DeleteController::class, 'userDestroy']);
+
+    // --- Project -------------------------------------------------------------
+    Route::get('/projects',               [ShowController::class,   'projectIndex']);
+    Route::get('/projects/search',        [ShowController::class,   'projectSearch']);
+    Route::post('/projects',              [CreateController::class, 'projectStore']);
+    Route::get('/projects/{id}',          [ShowController::class,   'projectShow']);
+    Route::put('/projects/{id}',          [UpdateController::class, 'projectUpdate']);
+    Route::delete('/projects/{id}',       [DeleteController::class, 'projectDestroy']);
+    Route::post('/projects/{id}/members', [CreateController::class, 'projectAddMember']);
+    Route::post('/projects/{id}/posts',   [CreateController::class, 'projectStorePost']);
+
+    // --- Task ----------------------------------------------------------------
+    Route::get('/dashboard-stats',             [ShowController::class,   'taskDashboardStats']);
+    Route::get('/tasks',                       [ShowController::class,   'taskIndex']);
+    Route::get('/tasks/kpi',                   [ShowController::class,   'taskKPIStats']);
+    Route::get('/tasks/{id}',                  [ShowController::class,   'taskShow']);
+    Route::post('/tasks',                      [CreateController::class, 'taskStore']);
+    Route::put('/tasks/{id}',                  [UpdateController::class, 'taskUpdate']);
+    Route::delete('/tasks/{id}',               [DeleteController::class, 'taskDestroy']);
+    Route::get('/projects/{projectId}/tasks',  [ShowController::class,   'tasksByProject']);
+    Route::post('/projects/{projectId}/tasks', [CreateController::class, 'taskStore']);
+
+    // --- Chat ----------------------------------------------------------------
+    Route::get('/projects/{projectId}/chats',  [ShowController::class,   'chatIndex']);
+    Route::post('/projects/{projectId}/chats', [CreateController::class, 'chatStore']);
 });
