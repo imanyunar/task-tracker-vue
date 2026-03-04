@@ -22,5 +22,6 @@ Route::middleware('auth.manual')->group(function () {
     Route::post(  '/{model}',               [CreateController::class, 'store']);
     Route::get(   '/{model}/{id}',          [ShowController::class,   'show']);
     Route::put(   '/{model}/{id}',          [UpdateController::class, 'update']);
+    Route::post('/{model}/{action}',        [UpdateController::class, 'action']);
     Route::delete('/{model}/{id}',          [DeleteController::class, 'destroy']);
 });

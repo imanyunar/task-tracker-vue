@@ -9,9 +9,26 @@ use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class UpdateController extends Controller
 {
+
+    // Tambahkan ini di bagian Dynamic Routes di UpdateController.php
+
+/** POST /{model}/{id}/{action} atau POST /{model}/{action} */
+public function action(Request $request, string $model, $id = null, $action = null)
+{
+    // Jika URL-nya /api/profile/avatar, maka $id akan berisi 'avatar' 
+    // dan $action akan null. Kita perlu menghandle pergeseran parameter ini.
+    $targetAction = $action ?: $id; 
+
+    return match (true) {
+        $model === 'profile' && $targetAction === 'avatar'   => $this->avatarUpload($request),
+        $model === 'profile' && $targetAction === 'password' => $this->passwordUpdate($request),
+        default => response()->json(['message' => 'Action tidak ditemukan'], 404),
+    };
+}
     // =========================================================================
     // DYNAMIC ROUTES
     // =========================================================================
@@ -141,7 +158,8 @@ class UpdateController extends Controller
     }
 
     // =========================================================================
-    // PROFILE
+    // PROFILE — update nama & email
+    // PUT /profile  (via dynamic route)
     // =========================================================================
 
     private function profileUpdate(Request $request)
@@ -164,6 +182,92 @@ class UpdateController extends Controller
             'success' => true,
             'message' => 'Profil berhasil diperbarui',
             'data'    => $user,
+        ]);
+    }
+
+    // =========================================================================
+    // PROFILE — ganti password
+    // PUT /profile/password
+    // =========================================================================
+
+    public function passwordUpdate(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Sesi tidak valid'], 401);
+        }
+
+        $request->validate([
+            'current_password'      => 'required|string',
+            'password'              => 'required|string|min:8|confirmed',
+            'password_confirmation' => 'required|string',
+        ]);
+
+        // Verifikasi password lama
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password saat ini tidak sesuai.',
+            ], 422);
+        }
+
+        // Pastikan password baru berbeda dari yang lama
+        if (Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password baru tidak boleh sama dengan password lama.',
+            ], 422);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->password),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password berhasil diperbarui.',
+        ]);
+    }
+
+    // =========================================================================
+    // PROFILE — upload avatar
+    // POST /profile/avatar
+    // =========================================================================
+
+    public function avatarUpload(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Sesi tidak valid'], 401);
+        }
+
+        $request->validate([
+            'avatar' => 'required|image|mimes:jpg,jpeg,png,webp|max:2048', // maks 2 MB
+        ]);
+
+        // Hapus avatar lama jika bukan URL eksternal (ui-avatars dll)
+        if ($user->avatar && !str_starts_with($user->avatar, 'http')) {
+            Storage::disk('public')->delete($user->avatar);
+        }
+
+        // Simpan file baru → storage/app/public/avatars/{user_id}/filename
+        $path = $request->file('avatar')->store(
+            'avatars/' . $user->id,
+            'public'
+        );
+
+        $user->update(['avatar' => $path]);
+        $user->load('department', 'role');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Foto profil berhasil diperbarui.',
+            'data'    => array_merge($user->toArray(), [
+                // URL lengkap agar langsung bisa dipakai di <img src>
+                'avatar' => asset('storage/' . $path),
+            ]),
         ]);
     }
 }

@@ -21,6 +21,7 @@ class User extends Authenticatable
         'department_id',
         'role_id',
         'api_token',
+        'avatar',
     ];
 
     /**
