@@ -82,13 +82,14 @@ const {
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-2 ml-1">Departemen</label>
             <div class="relative">
-              <select
-                v-model="form.department"
-                class="w-full px-5 py-4 bg-slate-950/50 border border-slate-700 rounded-2xl text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all appearance-none"
-              >
-                <option value="" disabled>Pilih Departemen Kerja</option>
-                <option v-for="d in staticDepartments" :key="d.id" :value="d.id">{{ d.name }}</option>
-              </select>
+              <select v-model="form.department" :disabled="loadingDepts">
+                  <option value="" disabled>
+                    {{ loadingDepts ? 'Memuat...' : 'Pilih Departemen' }}
+                  </option>
+                  <option v-for="dept in departments" :key="dept.id" :value="dept.id">
+                    {{ dept.name }}
+                  </option>
+                </select>
               <div class="absolute inset-y-0 right-5 flex items-center pointer-events-none text-slate-500">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
               </div>

@@ -11,43 +11,80 @@ use Illuminate\Http\Request;
 
 class DeleteController extends Controller
 {
-    // ─── Auth ─────────────────────────────────────────────────────────────────
+    // =========================================================================
+    // DYNAMIC ROUTES
+    // =========================================================================
 
-    public function logout(Request $request)
+    /** DELETE /{model}/{id} */
+    public function destroy(Request $request, string $model, $id)
     {
-        $request->user()->update(['api_token' => null]);
-
-        return response()->json(['success' => true, 'message' => 'Berhasil logout']);
+        return match ($model) {
+            'departments' => $this->departmentDestroy($request, $id),
+            'users'       => $this->userDestroy($request, $id),
+            'projects'    => $this->projectDestroy($request, $id),
+            'tasks'       => $this->taskDestroy($request, $id),
+            default       => response()->json(['message' => 'Model tidak ditemukan'], 404),
+        };
     }
 
-    // ─── Department ───────────────────────────────────────────────────────────
+    // =========================================================================
+    // DEPARTMENT
+    // =========================================================================
 
-    public function departmentDestroy($id)
+    private function departmentDestroy(Request $request, $id)
     {
-        Department::findOrFail($id)->delete();
+        if ($request->user()->role_id > 1) {
+            return response()->json(['message' => 'Hanya Admin'], 403);
+        }
+
+        $dept = Department::find($id);
+
+        if (!$dept) {
+            return response()->json(['message' => 'Departemen tidak ditemukan'], 404);
+        }
+
+        // Peringatan: onDelete cascade di migrasi akan hapus semua user di departemen ini
+        $dept->delete();
 
         return response()->json(['success' => true, 'message' => 'Departemen berhasil dihapus']);
     }
 
-    // ─── User ─────────────────────────────────────────────────────────────────
+    // =========================================================================
+    // USER
+    // =========================================================================
 
-    public function userDestroy($id)
+    private function userDestroy(Request $request, $id)
     {
-        User::findOrFail($id)->delete();
+        if ($request->user()->role_id > 1) {
+            return response()->json(['message' => 'Hanya Admin'], 403);
+        }
+
+        $user = User::find($id);
+
+        if (!$user) {
+            return response()->json(['message' => 'User tidak ditemukan'], 404);
+        }
+
+        $user->delete();
 
         return response()->json(['success' => true, 'message' => 'User telah dihapus dari sistem']);
     }
 
-    // ─── Project ──────────────────────────────────────────────────────────────
+    // =========================================================================
+    // PROJECT
+    // =========================================================================
 
-    public function projectDestroy(Request $request, $id)
+    private function projectDestroy(Request $request, $id)
     {
         $user    = $request->user();
         $project = Project::findOrFail($id);
-        $role    = $project->members()->where('user_id', $user->id)->first()?->pivot->role_in_project;
 
-        if ($user->role_id != 1 && $role !== Project::OWNER) {
-            return response()->json(['success' => false, 'message' => 'Hanya Owner proyek yang bisa menghapus'], 403);
+        $member        = $project->members()->where('user_id', $user->id)->first();
+        $roleInProject = $member ? $member->pivot->role_in_project : null;
+
+        // Hanya Admin global atau Owner project yang boleh hapus
+        if ((int) $user->role_id !== 1 && $roleInProject !== Project::OWNER) {
+            return response()->json(['success' => false, 'message' => 'Hanya Owner Proyek yang bisa menghapus'], 403);
         }
 
         $project->delete();
@@ -55,16 +92,36 @@ class DeleteController extends Controller
         return response()->json(['success' => true, 'message' => 'Proyek dihapus']);
     }
 
-    // ─── Task ─────────────────────────────────────────────────────────────────
+    // =========================================================================
+    // TASK
+    // =========================================================================
 
-    public function taskDestroy(Request $request, $id)
+    private function taskDestroy(Request $request, $id)
     {
+        // Employee tidak boleh hapus task
         if ($request->user()->role_id == 3) {
             return response()->json(['success' => false, 'message' => 'Akses ditolak'], 403);
         }
 
-        Task::findOrFail($id)->delete();
+        $task = Task::findOrFail($id);
+        $task->delete();
 
         return response()->json(['success' => true, 'message' => 'Tugas Berhasil Dihapus']);
+    }
+
+    // =========================================================================
+    // AUTH (fixed route)
+    // =========================================================================
+
+    public function logout(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user) {
+            $user->update(['api_token' => null]);
+            return response()->json(['success' => true, 'message' => 'Berhasil logout']);
+        }
+
+        return response()->json(['success' => false, 'message' => 'User tidak ditemukan'], 401);
     }
 }

@@ -1,35 +1,43 @@
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
+import { departmentService } from '../services'
 
 export function useRegister() {
   const authStore = useAuthStore()
-  const router = useRouter()
+  const router    = useRouter()
 
   const form = ref({
-    name: '',
-    email: '',
-    password: '',
+    name:                  '',
+    email:                 '',
+    password:              '',
     password_confirmation: '',
-    department: '' // Menggunakan ID sesuai kebutuhan backend
+    department:            '' as string | number,
   })
 
-  // Data statis departemen
-  const staticDepartments = [
-    { id: 1, name: 'IT Support' },
-    { id: 2, name: 'Human Resource' },
-    { id: 3, name: 'Marketing' },
-    { id: 5, name: 'Finance' },
-    { id: 6, name: 'RnD' },
-  ]
+  // Fetch dari API — tidak hardcoded
+  const departments  = ref<{ id: number; name: string }[]>([])
+  const loadingDepts = ref(false)
 
   const isSubmitting = ref(false)
   const notification = ref({ show: false, message: '', type: 'error' as 'error' | 'success' })
 
   const showNotify = (msg: string, type: 'error' | 'success' = 'error') => {
     notification.value = { show: true, message: msg, type }
-    setTimeout(() => notification.value.show = false, 4000)
+    setTimeout(() => (notification.value.show = false), 4000)
   }
+
+  onMounted(async () => {
+    loadingDepts.value = true
+    try {
+      const res = await departmentService.getAllDepartments()
+      departments.value = res.data.data || (res.data as any) || []
+    } catch {
+      showNotify('Gagal memuat daftar departemen', 'error')
+    } finally {
+      loadingDepts.value = false
+    }
+  })
 
   const handleSubmit = async () => {
     if (!form.value.name || !form.value.email || !form.value.password || !form.value.department) {
@@ -45,8 +53,10 @@ export function useRegister() {
       showNotify('Registrasi Berhasil! Mengalihkan ke Dashboard...', 'success')
       setTimeout(() => router.push('/dashboard'), 1500)
     } catch (err: any) {
-      const errorMsg = err.response?.data?.message || err.response?.data?.errors?.email?.[0] || 'Gagal mendaftar. Silakan coba lagi.'
-      showNotify(errorMsg, 'error')
+      const msg = err.response?.data?.message
+        || err.response?.data?.errors?.email?.[0]
+        || 'Gagal mendaftar. Silakan coba lagi.'
+      showNotify(msg, 'error')
     } finally {
       isSubmitting.value = false
     }
@@ -54,10 +64,11 @@ export function useRegister() {
 
   return {
     form,
-    staticDepartments,
+    departments,   // ganti staticDepartments → departments (fetch dari API)
+    loadingDepts,  // bisa dipakai di template untuk disable select saat loading
     isSubmitting,
     notification,
     handleSubmit,
-    showNotify
+    showNotify,
   }
 }
