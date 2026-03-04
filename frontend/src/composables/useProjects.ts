@@ -4,8 +4,8 @@ import { useAuthStore } from '../stores/auth'
 import { useProjectStore } from '../stores/project'
 import { projectService, userService, departmentService } from '../services'
 import type { Project as ServiceProject, Member, User } from '../services'
-
-// ===== TYPES =====
+import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
 
 export interface Project extends ServiceProject {
   status?: 'planned' | 'on_progress' | 'completed'
@@ -39,10 +39,7 @@ export interface FormData {
   department_id: number | undefined
 }
 
-// Re-export Member dari services agar komponen lain bisa import dari sini
 export type { Member, User }
-
-// ===== CONFIGS =====
 
 export const roleConfig: Record<number, { label: string; class: string }> = {
   1: { label: 'Owner',       class: 'text-rose-400 border-rose-500/30 bg-rose-500/10' },
@@ -59,14 +56,13 @@ export const statusConfig: Record<string, { label: string; class: string }> = {
 
 export const STATUS_KEYS = ['planned', 'on_progress', 'completed'] as const
 
-// ===== COMPOSABLE =====
-
 export function useProjects() {
   const authStore    = useAuthStore()
   const projectStore = useProjectStore()
   const router       = useRouter()
+  const toast        = useToast()
+  const { confirm }  = useConfirm()
 
-  // ===== STATE =====
   const loading     = ref(false)
   const searchQuery = ref('')
   const currentPage = ref(1)
@@ -76,13 +72,8 @@ export function useProjects() {
   const isEditing    = ref(false)
   const isSubmitting = ref(false)
   const formData = reactive<FormData>({
-    id:            undefined,
-    name:          '',
-    description:   '',
-    start_date:    '',
-    end_date:      '',
-    status:        'planned',
-    department_id: undefined,
+    id: undefined, name: '', description: '',
+    start_date: '', end_date: '', status: 'planned', department_id: undefined,
   })
 
   const showDetailsModal = ref(false)
@@ -96,18 +87,15 @@ export function useProjects() {
   const newMemberRole  = ref<number>(3)
   const isAddingMember = ref(false)
 
-  // ===== COMPUTED =====
   const user            = computed(() => authStore.user as User | null)
   const projects        = computed<Project[]>(() => (projectStore.projects as unknown as Project[]) || [])
   const canManageGlobal = computed(() => user.value?.role_id === 1 || user.value?.role_id === 2)
 
-  // Filter lokal sebagai fallback UX instan — search utama tetap dikirim ke backend
   const filteredProjects = computed<Project[]>(() => {
     if (!searchQuery.value) return projects.value
     const q = searchQuery.value.toLowerCase()
     return projects.value.filter(p =>
-      p.name?.toLowerCase().includes(q) ||
-      p.description?.toLowerCase().includes(q)
+      p.name?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q)
     )
   })
 
@@ -115,64 +103,41 @@ export function useProjects() {
   const activeCount    = computed(() => filteredProjects.value.filter(p => p.status === 'on_progress').length)
   const plannedCount   = computed(() => filteredProjects.value.filter(p => p.status === 'planned' || !p.status).length)
 
-  // ===== LIFECYCLE =====
   onMounted(async () => {
     await loadProjects(1)
-    if (canManageGlobal.value) {
-      loadAllUsers()
-      loadDepartments()
-    }
+    if (canManageGlobal.value) { loadAllUsers(); loadDepartments() }
   })
-
-  // ===== METHODS: DATA FETCHING =====
 
   const loadProjects = async (page = 1, search = '') => {
     loading.value = true
     try {
       await projectStore.fetchProjects(page, search)
       currentPage.value = page
-    } catch (err) {
-      console.error('Fetch Error:', err)
-    } finally {
-      loading.value = false
-    }
+    } catch (err) { console.error('Fetch Error:', err) }
+    finally { loading.value = false }
   }
 
-  // Dipanggil saat user ketik di search box
-  const handleSearch = async () => {
-    await loadProjects(1, searchQuery.value)
-  }
+  const handleSearch = async () => { await loadProjects(1, searchQuery.value) }
 
   const loadDepartments = async () => {
     if (user.value?.role_id !== 1) return
     try {
       const res = await departmentService.getAllDepartments()
       departments.value = res.data.data || (res.data as any) || []
-    } catch (err) {
-      console.error(err)
-    }
+    } catch (err) { console.error(err) }
   }
 
   const loadAllUsers = async () => {
     try {
       const res = await userService.getAllUsers()
       availableUsers.value = (res.data.data || (res.data as any) || []) as User[]
-    } catch (err) {
-      console.error(err)
-    }
+    } catch (err) { console.error(err) }
   }
-
-  // ===== METHODS: MODAL CREATE/EDIT =====
 
   const openCreateModal = () => {
     isEditing.value = false
     Object.assign(formData, {
-      id:            undefined,
-      name:          '',
-      description:   '',
-      start_date:    '',
-      end_date:      '',
-      status:        'planned',
+      id: undefined, name: '', description: '', start_date: '', end_date: '', status: 'planned',
       department_id: user.value?.role_id === 1 ? undefined : user.value?.department_id,
     })
     showModal.value = true
@@ -181,11 +146,9 @@ export function useProjects() {
   const openEditModal = (project: Project) => {
     isEditing.value = true
     Object.assign(formData, {
-      id:            project.id,
-      name:          project.name,
-      description:   project.description,
-      start_date:    project.start_date ? project.start_date.substring(0, 10) : '',
-      end_date:      project.end_date   ? project.end_date.substring(0, 10)   : '',
+      id: project.id, name: project.name, description: project.description,
+      start_date: project.start_date ? project.start_date.substring(0, 10) : '',
+      end_date:   project.end_date   ? project.end_date.substring(0, 10)   : '',
       status:        project.status ?? 'planned',
       department_id: project.department_id,
     })
@@ -200,38 +163,36 @@ export function useProjects() {
       const { id, ...payload } = formData
       if (isEditing.value && id !== undefined) {
         await projectStore.updateProject(id, payload)
+        toast.success('Proyek berhasil diperbarui!')
       } else {
         await projectStore.createProject(payload)
+        toast.success('Proyek berhasil dibuat!')
       }
       await loadProjects(1)
       closeModal()
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } }
-      alert(error.response?.data?.message || 'Gagal memproses data.')
-    } finally {
-      isSubmitting.value = false
-    }
+      toast.error(error.response?.data?.message || 'Gagal memproses data.')
+    } finally { isSubmitting.value = false }
   }
 
   const confirmDelete = async (id: number) => {
-    if (!confirm('Hapus proyek ini secara permanen?')) return
+    const ok = await confirm({
+      title: 'Hapus Proyek',
+      message: 'Hapus proyek ini secara permanen? Semua data terkait akan hilang.',
+      type: 'danger', confirmText: 'Hapus Permanen',
+    })
+    if (!ok) return
     try {
       await projectStore.deleteProject(id)
       await loadProjects(1)
-    } catch (err) {
-      console.error(err)
-      alert('Gagal menghapus.')
-    }
+      toast.success('Proyek berhasil dihapus.')
+    } catch (err) { console.error(err); toast.error('Gagal menghapus proyek.') }
   }
 
-  // ===== METHODS: MODAL DETAIL =====
-
   const openDetails = async (project: Project) => {
-    selectedProject.value  = project
-    activeTab.value        = 'tasks'
-    showDetailsModal.value = true
-    projectTasks.value     = []
-    projectMembers.value   = []
+    selectedProject.value = project; activeTab.value = 'tasks'
+    showDetailsModal.value = true; projectTasks.value = []; projectMembers.value = []
     try {
       const [detailRes, tasksRes] = await Promise.all([
         projectService.getProjectById(project.id),
@@ -239,12 +200,8 @@ export function useProjects() {
       ])
       const detail = (detailRes.data as any).data || detailRes.data
       projectMembers.value = detail.members || []
-      projectTasks.value   = (tasksRes.data as any).tasks
-                          || (tasksRes.data as any).data
-                          || []
-    } catch (err) {
-      console.error(err)
-    }
+      projectTasks.value   = (tasksRes.data as any).tasks || (tasksRes.data as any).data || []
+    } catch (err) { console.error(err) }
   }
 
   const closeDetailsModal = () => { showDetailsModal.value = false }
@@ -253,104 +210,55 @@ export function useProjects() {
     router.push({ name: 'ProjectDetail', params: { id: String(projectId) } })
   }
 
-  // ===== METHODS: MEMBER MANAGEMENT =====
-
   const addMember = async () => {
     if (!newMemberId.value || !selectedProject.value) return
     isAddingMember.value = true
     try {
       await projectService.addMember(selectedProject.value.id, {
-        user_id:         newMemberId.value as number,
-        role_in_project: Number(newMemberRole.value),
+        user_id: newMemberId.value as number, role_in_project: Number(newMemberRole.value),
       })
-      // Refresh members dari backend setelah tambah
       const detailRes = await projectService.getProjectById(selectedProject.value.id)
       const detail    = (detailRes.data as any).data || detailRes.data
       projectMembers.value = detail.members || []
       newMemberId.value = ''
-      alert('Anggota berhasil ditambahkan!')
+      toast.success('Anggota berhasil ditambahkan!')
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } }
-      alert(error.response?.data?.message || 'Gagal menambahkan.')
-    } finally {
-      isAddingMember.value = false
-    }
+      toast.error(error.response?.data?.message || 'Gagal menambahkan anggota.')
+    } finally { isAddingMember.value = false }
   }
 
   const removeMember = async (memberId: number) => {
-    if (!confirm('Hapus anggota ini dari proyek?')) return
-    if (!selectedProject.value) return
+    const ok = await confirm({ message: 'Hapus anggota ini dari proyek?', type: 'danger', confirmText: 'Hapus Anggota' })
+    if (!ok || !selectedProject.value) return
     try {
       const { default: apiClient } = await import('../services/api')
       await apiClient.delete(`/projects/${selectedProject.value.id}/members/${memberId}`)
       projectMembers.value = projectMembers.value.filter(m => m.id !== memberId)
-    } catch (err) {
-      console.error(err)
-      alert('Gagal menghapus anggota.')
-    }
+      toast.success('Anggota berhasil dihapus.')
+    } catch (err) { console.error(err); toast.error('Gagal menghapus anggota.') }
   }
 
   const updateMemberRole = async (memberId: number, roleId: number) => {
     if (!selectedProject.value) return
     try {
       const { default: apiClient } = await import('../services/api')
-      await apiClient.post(`/projects/${selectedProject.value.id}/members`, {
-        user_id: memberId,
-        role_in_project: roleId,
-      })
-      // Update lokal langsung tanpa reload
+      await apiClient.post(`/projects/${selectedProject.value.id}/members`, { user_id: memberId, role_in_project: roleId })
       const member = projectMembers.value.find(m => m.id === memberId)
-      if (member) {
-        if (member.pivot) member.pivot.role_in_project = roleId
-        ;(member as any).role_in_project = roleId
-      }
-    } catch (err) {
-      console.error(err)
-      alert('Gagal mengubah role.')
-    }
+      if (member) { if (member.pivot) member.pivot.role_in_project = roleId; (member as any).role_in_project = roleId }
+      toast.success('Role berhasil diperbarui.')
+    } catch (err) { console.error(err); toast.error('Gagal mengubah role.') }
   }
 
-  // ===== RETURN =====
   return {
-    // State
-    loading,
-    searchQuery,
-    departments,
-    showModal,
-    isEditing,
-    isSubmitting,
-    formData,
-    showDetailsModal,
-    activeTab,
-    selectedProject,
-    projectTasks,
-    projectMembers,
-    availableUsers,
-    newMemberId,
-    newMemberRole,
-    isAddingMember,
-
-    // Computed
-    user,
-    projects,
-    canManageGlobal,
-    filteredProjects,
-    completedCount,
-    activeCount,
-    plannedCount,
-
-    // Methods
-    handleSearch,
-    openCreateModal,
-    openEditModal,
-    closeModal,
-    submitProject,
-    confirmDelete,
-    openDetails,
-    closeDetailsModal,
-    goToWorkspace,
-    addMember,
-    removeMember,
-    updateMemberRole,
+    loading, searchQuery, departments,
+    showModal, isEditing, isSubmitting, formData,
+    showDetailsModal, activeTab, selectedProject, projectTasks, projectMembers,
+    availableUsers, newMemberId, newMemberRole, isAddingMember,
+    user, projects, canManageGlobal, filteredProjects,
+    completedCount, activeCount, plannedCount,
+    handleSearch, openCreateModal, openEditModal, closeModal,
+    submitProject, confirmDelete, openDetails, closeDetailsModal,
+    goToWorkspace, addMember, removeMember, updateMemberRole,
   }
 }

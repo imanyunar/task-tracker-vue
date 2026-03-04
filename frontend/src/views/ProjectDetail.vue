@@ -484,6 +484,7 @@
 import { ref, reactive, watch } from 'vue'
 import { useProjectDetail } from '@/composables/useProjectDetail'
 import apiClient from '@/services/api'
+import { useToast } from '@/composables/useToast'
 
 const {
   project,
@@ -529,6 +530,8 @@ const {
   saveTask,
 } = useProjectDetail()
 
+const toast = useToast()
+
 // ===== EDIT PROJECT MODAL =====
 const showEditModal = ref(false)
 const isSavingEdit = ref(false)
@@ -565,10 +568,11 @@ const submitEdit = async () => {
     const updated = res.data.data ?? res.data
     // Update data project lokal tanpa reload halaman
     Object.assign(project.value, updated)
+    toast.success('Proyek berhasil diperbarui!')
     closeEditModal()
   } catch (err) {
     console.error('Gagal menyimpan edit:', err)
-    alert('Gagal menyimpan perubahan.')
+    toast.error('Gagal menyimpan perubahan.')
   } finally {
     isSavingEdit.value = false
   }

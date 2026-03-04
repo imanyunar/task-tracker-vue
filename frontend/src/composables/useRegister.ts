@@ -2,10 +2,11 @@ import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 import { departmentService } from '../services'
-
+import { useToast } from '@/composables/useToast'
 export function useRegister() {
   const authStore = useAuthStore()
   const router    = useRouter()
+  const toast     = useToast()  
 
   const form = ref({
     name:                  '',
