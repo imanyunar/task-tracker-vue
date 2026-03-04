@@ -315,20 +315,28 @@
 
             <!-- Members tab -->
             <div v-if="activeTab === 'members'" class="animate-fade-in">
-              <div v-if="selectedProject?.my_role_id <= 2 || user?.role_id === 1" class="mb-6 p-5 bg-slate-900/60 border border-slate-800 rounded-2xl">
-                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Undang Anggota Baru</p>
+
+              <!-- Undang anggota BARU (hanya tampil user yang belum jadi member) -->
+              <div v-if="selectedProject?.my_role_id <= 2 || user?.role_id === 1" class="mb-6 p-5 bg-slate-900/60 border border-slate-800 rounded-2xl space-y-4">
+                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Undang Anggota Baru</p>
                 <div class="flex flex-col sm:flex-row gap-3">
                   <select v-model="newMemberId" class="select-field flex-1 text-sm">
-                    <option value="" disabled>Pilih User...</option>
-                    <option v-for="u in availableUsers" :key="u.id" :value="u.id">{{ u.name }} ({{ u.email }})</option>
+                    <option value="" disabled>
+                      {{ availableUsersForProject.length === 0 ? 'Semua user sudah jadi anggota' : 'Pilih User...' }}
+                    </option>
+                    <option v-for="u in availableUsersForProject" :key="u.id" :value="u.id">
+                      {{ u.name }} ({{ u.email }})
+                    </option>
                   </select>
                   <select v-model="newMemberRole" class="select-field w-full sm:w-44 text-sm">
                     <option :value="2">Manager</option>
                     <option :value="3">Contributor</option>
                     <option :value="4">Stakeholder</option>
                   </select>
-                  <button @click="addMember" :disabled="!newMemberId || isAddingMember" class="btn btn-primary rounded-xl text-sm disabled:opacity-40 whitespace-nowrap">
-                    {{ isAddingMember ? 'Memproses...' : 'Tambahkan' }}
+                  <button @click="addMember"
+                    :disabled="!newMemberId || isAddingMember || availableUsersForProject.length === 0"
+                    class="btn btn-primary rounded-xl text-sm disabled:opacity-40 whitespace-nowrap">
+                    {{ isAddingMember ? 'Memproses...' : '+ Undang' }}
                   </button>
                 </div>
               </div>
@@ -337,21 +345,40 @@
                 <p class="text-slate-500 text-sm font-bold m-0">Belum ada anggota.</p>
               </div>
               <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div v-for="member in projectMembers" :key="member.id" class="group/member flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800 rounded-2xl hover:border-slate-700 transition-all">
+                <div v-for="member in projectMembers" :key="member.id"
+                  class="group/member flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800 rounded-2xl hover:border-slate-700 transition-all">
                   <div class="flex items-center gap-3 min-w-0">
-                    <img :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=4f46e5&color=fff&bold=true&size=80`" class="w-10 h-10 rounded-xl border border-slate-700 flex-shrink-0">
+                    <img :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=4f46e5&color=fff&bold=true&size=80`"
+                      class="w-10 h-10 rounded-xl border border-slate-700 flex-shrink-0">
                     <div class="min-w-0">
                       <p class="text-sm font-bold text-white m-0 leading-tight truncate">{{ member.name }}</p>
                       <p class="text-[10px] text-slate-500 m-0 truncate">{{ member.email }}</p>
                     </div>
                   </div>
+
                   <div class="flex items-center gap-2 flex-shrink-0">
-                    <span v-if="member.pivot?.role_in_project" :class="['badge text-[9px]', roleConfig[member.pivot.role_in_project]?.class]">
-                      {{ roleConfig[member.pivot.role_in_project]?.label || 'Member' }}
-                    </span>
-                    <button v-if="(selectedProject?.my_role_id === 1 || user?.role_id === 1) && member.pivot?.role_in_project !== 1" @click="removeMember(member.id)" class="opacity-0 group-hover/member:opacity-100 p-1.5 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
+                    <!-- Jika canManage dan bukan owner: dropdown edit role langsung -->
+                    <template v-if="(selectedProject?.my_role_id <= 2 || user?.role_id === 1) && (member.pivot?.role_in_project ?? member.role_in_project) !== 1">
+                      <select
+                        :value="member.pivot?.role_in_project ?? member.role_in_project"
+                        @change="updateMemberRole(member.id, Number($event.target.value))"
+                        :class="['text-[9px] font-black uppercase tracking-wider border rounded-lg px-2 py-1.5 bg-transparent outline-none cursor-pointer transition-all hover:brightness-125',
+                          roleConfig[member.pivot?.role_in_project ?? member.role_in_project]?.class || 'text-slate-400 border-slate-600']">
+                        <option value="2" class="bg-slate-900 text-white normal-case">Manager</option>
+                        <option value="3" class="bg-slate-900 text-white normal-case">Contributor</option>
+                        <option value="4" class="bg-slate-900 text-white normal-case">Stakeholder</option>
+                      </select>
+                      <button @click="removeMember(member.id)"
+                        class="opacity-0 group-hover/member:opacity-100 p-1.5 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </template>
+                    <!-- Owner atau non-manager: badge saja -->
+                    <template v-else>
+                      <span :class="['badge text-[9px]', roleConfig[member.pivot?.role_in_project ?? member.role_in_project]?.class]">
+                        {{ roleConfig[member.pivot?.role_in_project ?? member.role_in_project]?.label || 'Member' }}
+                      </span>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -365,6 +392,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useProjects, roleConfig, statusConfig } from '../composables/useProjects'
 
 const {
@@ -380,8 +408,14 @@ const {
 
   // Methods
   loadMore, openCreateModal, openEditModal, closeModal, submitProject, confirmDelete,
-  openDetails, closeDetailsModal, goToWorkspace, addMember, removeMember,
+  openDetails, closeDetailsModal, goToWorkspace, addMember, removeMember, updateMemberRole,
 } = useProjects()
+
+// Users yang belum jadi member di project yang sedang dibuka
+const availableUsersForProject = computed(() => {
+  const memberIds = new Set(projectMembers.value.map((m: any) => m.id))
+  return availableUsers.value.filter((u: any) => !memberIds.has(u.id))
+})
 </script>
 
 <style scoped>

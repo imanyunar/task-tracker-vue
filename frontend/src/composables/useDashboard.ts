@@ -10,10 +10,11 @@ export interface DashboardStats {
   completion_rate: number
   timeliness_rate: number
   kpi_score: number
+  total_projects: number  // jumlah project on_progress yang diikuti user
 }
 
 // Hitung stats & KPI dari array tasks — tidak perlu request ke backend
-function hitungStats(tasks: Task[], userId: number): DashboardStats {
+function hitungStats(tasks: Task[], userId: number, activeProjectCount = 0): DashboardStats {
   const totalTasks     = tasks.length
   const completedTasks = tasks.filter(t => t.status === 'done').length
   const pendingTasks   = tasks.filter(t => t.status !== 'done').length
@@ -38,6 +39,7 @@ function hitungStats(tasks: Task[], userId: number): DashboardStats {
     completion_rate: Math.round(completionRate * 10) / 10,
     timeliness_rate: Math.round(timelinessRate * 10) / 10,
     kpi_score:       Math.round(kpiScore * 100) / 100,
+    total_projects:  activeProjectCount,
   }
 }
 
@@ -87,15 +89,29 @@ export function useDashboardPage() {
   const loadDashboard = async () => {
     loading.value = true
     try {
-      const res    = await taskService.getAllTasks()
-      const raw    = (res.data as any).data || res.data
-      const tasks  = Array.isArray(raw) ? raw : []
+      // Fetch tasks dan projects secara paralel
+      const { default: apiClient } = await import('../services/api')
+      const [taskRes, projectRes] = await Promise.all([
+        taskService.getAllTasks(),
+        apiClient.get('/projects').catch(() => null),
+      ])
 
+      const raw   = (taskRes.data as any).data || taskRes.data
+      const tasks = Array.isArray(raw) ? raw : []
       allTasks.value = tasks
 
-      // Hitung stats dari data tasks — tidak perlu endpoint /dashboard-stats
+      // Hitung proyek aktif (on_progress) yang diikuti user
+      const rawProjects  = projectRes
+        ? ((projectRes.data as any).data || projectRes.data || [])
+        : []
+      const projectList  = Array.isArray(rawProjects) ? rawProjects : []
+      const activeCount  = projectList.filter(
+        (p: any) => p.status === 'on_progress' || p.status === 'planned' 
+      ).length
+
+      // Hitung stats dari tasks + jumlah proyek aktif
       const userId   = user.value?.id ?? 0
-      stats.value    = hitungStats(tasks, userId)
+      stats.value    = hitungStats(tasks, userId, activeCount)
     } catch (e) {
       console.error('Gagal memuat dashboard:', e)
     } finally {

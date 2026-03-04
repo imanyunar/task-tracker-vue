@@ -120,8 +120,7 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        // 6. Assign users to projects (Menggunakan pivot project_user)
-        // Gunakan role_in_project: 1:OWNER, 2:MANAGER, 3:CONTRIBUTOR, 4:STAKEHOLDER
+        
         $projects[0]->members()->sync([
             $admin->id   => ['role_in_project' => 1],
             $manager->id => ['role_in_project' => 2],

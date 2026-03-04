@@ -59,7 +59,8 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                 Hapus
               </button>
-              <button v-if="canManageProject" @click="isEditingProject = true"
+              <!-- Tombol edit → buka modal edit -->
+              <button v-if="canManageProject" @click="openEditModal"
                 class="flex items-center gap-2 px-5 py-3 bg-white/10 hover:bg-white/20 border border-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 Edit Proyek
@@ -231,26 +232,37 @@
             <p class="text-slate-500 text-xs mt-1 uppercase tracking-widest font-bold">{{ project.members?.length || 0 }} Orang</p>
           </div>
 
-          <!-- Form Undang Anggota -->
-          <div v-if="canManageProject" class="mb-6 p-5 bg-slate-900/60 border border-slate-800 rounded-2xl">
-            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Undang Anggota Baru</p>
-            <div class="flex flex-col sm:flex-row gap-3">
-              <select v-model.number="newMemberId"
-                class="flex-1 px-3 py-2.5 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none transition-all">
-                <option value="" disabled>Pilih User...</option>
-                <option v-for="u in availableUsers" :key="u.id" :value="u.id">{{ u.name }} ({{ u.email }})</option>
-              </select>
-              <select v-model.number="newMemberRole"
-                class="w-full sm:w-44 px-3 py-2.5 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none transition-all">
-                <option :value="2">Manager</option>
-                <option :value="3">Contributor</option>
-                <option :value="4">Stakeholder</option>
-              </select>
-              <button @click="addMember" :disabled="!newMemberId || isAddingMember"
-                class="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-900/40 whitespace-nowrap">
-                {{ isAddingMember ? 'Memproses...' : 'Tambahkan' }}
-              </button>
+          <!-- Form Undang Anggota Baru -->
+          <div v-if="canManageProject" class="mb-6 p-5 bg-slate-900/60 border border-slate-800 rounded-2xl space-y-5">
+
+            <!-- Undang user baru -->
+            <div>
+              <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Undang Anggota Baru</p>
+              <div v-if="isLoadingUsers" class="flex items-center gap-2 text-slate-500 text-xs py-2">
+                <div class="w-4 h-4 border border-violet-500/40 border-t-violet-500 rounded-full animate-spin"></div>
+                Memuat daftar user...
+              </div>
+              <div v-else class="flex flex-col sm:flex-row gap-3">
+                <select v-model.number="newMemberId"
+                  class="flex-1 px-3 py-2.5 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none transition-all">
+                  <option value="" disabled>
+                    {{ availableUsers.length === 0 ? 'Semua user sudah jadi anggota' : 'Pilih User...' }}
+                  </option>
+                  <option v-for="u in availableUsers" :key="u.id" :value="u.id">{{ u.name }} ({{ u.email }})</option>
+                </select>
+                <select v-model.number="newMemberRole"
+                  class="w-full sm:w-44 px-3 py-2.5 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none transition-all">
+                  <option :value="2">Manager</option>
+                  <option :value="3">Contributor</option>
+                  <option :value="4">Stakeholder</option>
+                </select>
+                <button @click="addMember" :disabled="!newMemberId || isAddingMember || availableUsers.length === 0"
+                  class="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-900/40 whitespace-nowrap">
+                  {{ isAddingMember ? 'Memproses...' : '+ Undang' }}
+                </button>
+              </div>
             </div>
+
           </div>
 
           <div class="grid gap-3">
@@ -270,15 +282,29 @@
                   <p class="text-[10px] text-slate-500 font-bold tracking-wide mt-0.5">{{ member.email }}</p>
                 </div>
               </div>
-              <div class="flex items-center gap-3">
-                <span :class="['px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border', getMemberRoleClass(member)]">
-                  {{ getMemberRoleName(member) }}
-                </span>
-                <button v-if="canManageProject && member.id !== currentUser.id"
-                  @click="removeMember(member.id)"
-                  class="opacity-0 group-hover:opacity-100 text-slate-700 hover:text-rose-500 transition-all p-2 rounded-lg hover:bg-rose-500/10">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                </button>
+              <div class="flex items-center gap-2">
+                <!-- Jika canManage dan bukan diri sendiri: tampilkan dropdown edit role -->
+                <template v-if="canManageProject && member.id !== currentUser.id">
+                  <select
+                    :value="member.role_in_project ?? member.pivot?.role_in_project"
+                    @change="updateMemberRole(member.id, Number($event.target.value))"
+                    :class="['px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border bg-transparent outline-none cursor-pointer transition-all hover:brightness-125', getMemberRoleClass(member)]">
+                    <option value="2" class="bg-slate-900 text-white normal-case">Manager</option>
+                    <option value="3" class="bg-slate-900 text-white normal-case">Contributor</option>
+                    <option value="4" class="bg-slate-900 text-white normal-case">Stakeholder</option>
+                  </select>
+                  <button
+                    @click="removeMember(member.id)"
+                    class="opacity-0 group-hover:opacity-100 text-slate-700 hover:text-rose-500 transition-all p-2 rounded-lg hover:bg-rose-500/10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                </template>
+                <!-- Jika bukan canManage atau diri sendiri: badge saja -->
+                <template v-else>
+                  <span :class="['px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border', getMemberRoleClass(member)]">
+                    {{ getMemberRoleName(member) }}
+                  </span>
+                </template>
               </div>
             </div>
           </div>
@@ -294,12 +320,82 @@
       <button @click="$router.push('/projects')" class="text-violet-400 hover:text-violet-300 text-xs font-bold transition-colors">Kembali ke daftar proyek</button>
     </div>
 
+    <!-- ===== MODAL EDIT PROJECT ===== -->
+    <Teleport to="body">
+      <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="closeEditModal">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+        <div class="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-slide-up max-h-[92vh] overflow-y-auto task-modal-scroll">
+
+          <!-- Header -->
+          <div class="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/5">
+            <div>
+              <h3 class="text-xl font-bold text-white">Edit Proyek</h3>
+              <p class="text-xs text-slate-400 mt-1">Perbarui informasi proyek ini.</p>
+            </div>
+            <button @click="closeEditModal" class="p-2 text-slate-500 hover:text-white hover:bg-white/10 rounded-full transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="p-6 space-y-5">
+
+            <div>
+              <label class="text-[11px] text-slate-500 font-bold block mb-1.5 ml-1">Nama Proyek</label>
+              <input v-model="editForm.name" type="text" placeholder="Nama proyek..."
+                class="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-white placeholder-slate-600 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all" />
+            </div>
+
+            <div>
+              <label class="text-[11px] text-slate-500 font-bold block mb-1.5 ml-1">Deskripsi</label>
+              <textarea v-model="editForm.description" rows="3" placeholder="Deskripsi proyek..."
+                class="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-white placeholder-slate-600 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all resize-none"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-[11px] text-slate-500 font-bold block mb-1.5 ml-1">Tanggal Mulai</label>
+                <input v-model="editForm.start_date" type="date"
+                  class="w-full px-4 py-2.5 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all" />
+              </div>
+              <div>
+                <label class="text-[11px] text-slate-500 font-bold block mb-1.5 ml-1">Tanggal Selesai</label>
+                <input v-model="editForm.end_date" type="date"
+                  class="w-full px-4 py-2.5 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all" />
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[11px] text-slate-500 font-bold block mb-1.5 ml-1">Status</label>
+              <select v-model="editForm.status"
+                class="w-full px-3 py-2.5 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none transition-all">
+                <option value="planned">Planned</option>
+                <option value="on_progress">On Progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
+              <button type="button" @click="closeEditModal"
+                class="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                Batal
+              </button>
+              <button @click="submitEdit" :disabled="isSavingEdit"
+                class="px-8 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold shadow-lg shadow-violet-600/20 active:scale-95 transition-all">
+                {{ isSavingEdit ? 'Menyimpan...' : 'Simpan Perubahan' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- ===== MODAL BUAT TUGAS ===== -->
     <Teleport to="body">
       <div v-if="showTaskModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="closeTaskModal">
         <div class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
         <div class="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-slide-up max-h-[92vh] overflow-y-auto task-modal-scroll">
-          
+
           <!-- Header -->
           <div class="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/5">
             <div>
@@ -315,25 +411,14 @@
           <div class="p-6">
             <form @submit.prevent="saveTask" class="space-y-6">
 
-              <!-- Informasi Utama -->
               <div class="space-y-4">
                 <label class="text-violet-400 text-[10px] uppercase tracking-widest font-black block">Informasi Utama</label>
-                <input
-                  v-model="taskForm.title"
-                  type="text"
-                  placeholder="Judul Tugas..."
-                  required
-                  class="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-white placeholder-slate-600 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all"
-                />
-                <textarea
-                  v-model="taskForm.description"
-                  rows="3"
-                  placeholder="Tambahkan deskripsi detail di sini..."
-                  class="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-white placeholder-slate-600 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all resize-none"
-                ></textarea>
+                <input v-model="taskForm.title" type="text" placeholder="Judul Tugas..." required
+                  class="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-white placeholder-slate-600 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all" />
+                <textarea v-model="taskForm.description" rows="3" placeholder="Tambahkan deskripsi detail di sini..."
+                  class="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-white placeholder-slate-600 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all resize-none"></textarea>
               </div>
 
-              <!-- Detail & Waktu -->
               <div class="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-4">
                 <label class="text-violet-400 text-[10px] uppercase tracking-widest font-black block">Detail & Waktu</label>
                 <div class="grid grid-cols-2 gap-4">
@@ -358,16 +443,11 @@
                 </div>
                 <div>
                   <label class="text-[11px] text-slate-500 font-bold block mb-1.5 ml-1">Tenggat Waktu</label>
-                  <input
-                    v-model="taskForm.due_date"
-                    type="datetime-local"
-                    required
-                    class="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all"
-                  />
+                  <input v-model="taskForm.due_date" type="datetime-local" required
+                    class="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 focus:border-violet-500 rounded-xl text-sm text-slate-300 outline-none focus:ring-2 focus:ring-violet-500/30 transition-all" />
                 </div>
               </div>
 
-              <!-- Assignee -->
               <div>
                 <label class="text-violet-400 text-[10px] uppercase tracking-widest font-black block mb-3">Penugasan</label>
                 <div>
@@ -379,7 +459,6 @@
                 </div>
               </div>
 
-              <!-- Actions -->
               <div class="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
                 <button type="button" @click="closeTaskModal"
                   class="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
@@ -393,7 +472,6 @@
 
             </form>
           </div>
-
         </div>
       </div>
     </Teleport>
@@ -403,7 +481,9 @@
 
 
 <script setup>
+import { ref, reactive, watch } from 'vue'
 import { useProjectDetail } from '@/composables/useProjectDetail'
+import apiClient from '@/services/api'
 
 const {
   project,
@@ -435,6 +515,7 @@ const {
   sendChatMessage,
   handleDeleteProject,
   removeMember,
+  updateMemberRole,
   availableUsers,
   newMemberId,
   newMemberRole,
@@ -445,8 +526,64 @@ const {
   taskForm,
   openTaskModal,
   closeTaskModal,
-  saveTask
+  saveTask,
 } = useProjectDetail()
+
+// ===== EDIT PROJECT MODAL =====
+const showEditModal = ref(false)
+const isSavingEdit = ref(false)
+const isLoadingUsers = ref(false)
+
+const editForm = reactive({
+  name: '',
+  description: '',
+  start_date: '',
+  end_date: '',
+  status: 'planned',
+})
+
+// Isi form dari data project saat ini
+const openEditModal = () => {
+  if (!project.value) return
+  editForm.name        = project.value.name        || ''
+  editForm.description = project.value.description || ''
+  editForm.start_date  = project.value.start_date  ? project.value.start_date.substring(0, 10) : ''
+  editForm.end_date    = project.value.end_date    ? project.value.end_date.substring(0, 10)   : ''
+  editForm.status      = project.value.status      || 'planned'
+  showEditModal.value  = true
+}
+
+const closeEditModal = () => {
+  showEditModal.value = false
+}
+
+const submitEdit = async () => {
+  if (!project.value) return
+  isSavingEdit.value = true
+  try {
+    const res = await apiClient.put(`/projects/${project.value.id}`, editForm)
+    const updated = res.data.data ?? res.data
+    // Update data project lokal tanpa reload halaman
+    Object.assign(project.value, updated)
+    closeEditModal()
+  } catch (err) {
+    console.error('Gagal menyimpan edit:', err)
+    alert('Gagal menyimpan perubahan.')
+  } finally {
+    isSavingEdit.value = false
+  }
+}
+
+// ===== FETCH USERS saat tab people dibuka =====
+// Tambah loading state agar select tidak kosong diam-diam
+watch(currentTab, async (val) => {
+  if (val === 'people' && availableUsers.value.length === 0) {
+    isLoadingUsers.value = true
+    // Beri waktu fetchAllUsers di composable selesai
+    await new Promise(resolve => setTimeout(resolve, 300))
+    isLoadingUsers.value = false
+  }
+})
 </script>
 
 

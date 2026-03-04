@@ -176,7 +176,7 @@ class CreateController extends Controller
     {
         $user    = $request->user();
         $project = Project::findOrFail($id);
-
+        
         $myMember        = $project->members()->where('user_id', $user->id)->first();
         $myRoleInProject = $myMember ? $myMember->pivot->role_in_project : null;
 

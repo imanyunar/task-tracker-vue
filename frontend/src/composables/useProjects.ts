@@ -281,13 +281,32 @@ export function useProjects() {
     if (!confirm('Hapus anggota ini dari proyek?')) return
     if (!selectedProject.value) return
     try {
-      // Tidak ada di dynamic route — pakai apiClient langsung
       const { default: apiClient } = await import('../services/api')
       await apiClient.delete(`/projects/${selectedProject.value.id}/members/${memberId}`)
       projectMembers.value = projectMembers.value.filter(m => m.id !== memberId)
     } catch (err) {
       console.error(err)
       alert('Gagal menghapus anggota.')
+    }
+  }
+
+  const updateMemberRole = async (memberId: number, roleId: number) => {
+    if (!selectedProject.value) return
+    try {
+      const { default: apiClient } = await import('../services/api')
+      await apiClient.post(`/projects/${selectedProject.value.id}/members`, {
+        user_id: memberId,
+        role_in_project: roleId,
+      })
+      // Update lokal langsung tanpa reload
+      const member = projectMembers.value.find(m => m.id === memberId)
+      if (member) {
+        if (member.pivot) member.pivot.role_in_project = roleId
+        ;(member as any).role_in_project = roleId
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Gagal mengubah role.')
     }
   }
 
@@ -332,5 +351,6 @@ export function useProjects() {
     goToWorkspace,
     addMember,
     removeMember,
+    updateMemberRole,
   }
 }
