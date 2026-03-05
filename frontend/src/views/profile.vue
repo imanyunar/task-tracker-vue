@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useProfile } from '../composables/useProfile'
 import { useToast } from '@/composables/useToast'
 import apiClient from '@/services/api'
@@ -53,10 +53,20 @@ const isDraggingAvatar = ref(false)
 
 const currentAvatar = computed(() => {
   if (avatarPreview.value) return avatarPreview.value
-  if (userStore.profile?.avatar) return userStore.profile.avatar
-  const name = encodeURIComponent(userStore.profile?.name || 'U')
-  return `https://ui-avatars.com/api/?name=${name}&background=4f46e5&color=fff&bold=true&size=200`
+  return userStore.profile?.avatar || null
 })
+
+// Inisial dari nama user (maks 2 karakter)
+const userInitials = computed(() => {
+  const name = userStore.profile?.name || ''
+  return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?'
+})
+
+// Track jika foto gagal dimuat
+const avatarError = ref(false)
+
+// Reset error setiap kali avatar URL berubah
+watch(currentAvatar, () => { avatarError.value = false })
 
 const triggerAvatarInput = () => avatarInput.value?.click()
 
@@ -236,7 +246,18 @@ const formatDate = (d) => {
                   isDraggingAvatar ? 'border-indigo-400 scale-105' : 'border-white/10 group-hover:border-indigo-500/50']"
                 @click="triggerAvatarInput"
               >
-                <img :src="currentAvatar" class="w-full h-full object-cover" alt="Avatar">
+                <!-- Foto jika ada dan berhasil load -->
+                <img
+                  v-if="currentAvatar && !avatarError"
+                  :src="currentAvatar"
+                  class="w-full h-full object-cover"
+                  alt="Avatar"
+                  @error="avatarError = true"
+                >
+                <!-- Inisial fallback: tidak ada foto ATAU foto gagal load -->
+                <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-violet-700 select-none">
+                  <span class="text-4xl font-black text-white tracking-tight">{{ userInitials }}</span>
+                </div>
 
                 <!-- Overlay hover -->
                 <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">

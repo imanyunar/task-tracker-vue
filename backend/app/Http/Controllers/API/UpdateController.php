@@ -258,16 +258,15 @@ public function action(Request $request, string $model, $id = null, $action = nu
             'public'
         );
 
-        $user->update(['avatar' => $path]);
+        // Simpan full URL ke DB agar konsisten saat fetchProfile
+        $fullUrl = asset('storage/' . $path);
+        $user->update(['avatar' => $fullUrl]);
         $user->load('department', 'role');
 
         return response()->json([
             'success' => true,
             'message' => 'Foto profil berhasil diperbarui.',
-            'data'    => array_merge($user->toArray(), [
-                // URL lengkap agar langsung bisa dipakai di <img src>
-                'avatar' => asset('storage/' . $path),
-            ]),
+            'data'    => $user,
         ]);
     }
 }
