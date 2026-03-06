@@ -5,6 +5,7 @@ import { useProjectStore } from '../stores/project'
 import { projectService, userService, departmentService } from '../services'
 import type { Project as ServiceProject, Member, User } from '../services'
 import { useToast } from '@/composables/useToast'
+import apiClient from '@/services/api'
 import { useConfirm } from '@/composables/useConfirm'
 
 export interface Project extends ServiceProject {
@@ -232,7 +233,6 @@ export function useProjects() {
     const ok = await confirm({ message: 'Hapus anggota ini dari proyek?', type: 'danger', confirmText: 'Hapus Anggota' })
     if (!ok || !selectedProject.value) return
     try {
-      const { default: apiClient } = await import('../services/api')
       await apiClient.delete(`/projects/${selectedProject.value.id}/members/${memberId}`)
       projectMembers.value = projectMembers.value.filter(m => m.id !== memberId)
       toast.success('Anggota berhasil dihapus.')
@@ -242,7 +242,6 @@ export function useProjects() {
   const updateMemberRole = async (memberId: number, roleId: number) => {
     if (!selectedProject.value) return
     try {
-      const { default: apiClient } = await import('../services/api')
       await apiClient.post(`/projects/${selectedProject.value.id}/members`, { user_id: memberId, role_in_project: roleId })
       const member = projectMembers.value.find(m => m.id === memberId)
       if (member) { if (member.pivot) member.pivot.role_in_project = roleId; (member as any).role_in_project = roleId }

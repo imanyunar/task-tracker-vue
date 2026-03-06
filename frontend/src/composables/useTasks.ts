@@ -26,23 +26,25 @@ export function useTasksDashboard() {
   const isAdminGlobal   = computed(() => user.value?.role_id === 1)
   const isManagerGlobal = computed(() => user.value?.role_id === 2)
 
-  const getRoleInProject = (project: any) => {
-    if (!project || !project.members) return 'none'
+  // Backend return angka: 1=Owner, 2=Manager, 3=Contributor, 4=Stakeholder
+  const getRoleInProject = (project: any): number | null => {
+    if (!project || !project.members) return null
     const member = project.members.find((m: any) => m.id === user.value?.id)
-    return member?.pivot?.role || 'none'
+    const raw = member?.pivot?.role_in_project ?? member?.role_in_project
+    return raw != null ? Number(raw) : null
   }
 
   const canCreateAnyTask = computed(() => {
     if (isAdminGlobal.value || isManagerGlobal.value) return true
     return projects.value.some(p => {
       const role = getRoleInProject(p)
-      return role === 'owner' || role === 'manager'
+      return role === 1 || role === 2  // Owner atau Manager
     })
   })
 
-  const canEditFullTask   = (task: any) => { if (isAdminGlobal.value) return true; const role = getRoleInProject(task.project); return role === 'owner' || role === 'manager' }
-  const canDeleteTask     = (task: any) => { if (isAdminGlobal.value) return true; const role = getRoleInProject(task.project); return role === 'owner' }
-  const canUpdateStatusOnly = (task: any) => { const role = getRoleInProject(task.project); return role !== 'none' && role !== 'stakeholder' }
+  const canEditFullTask     = (task: any) => { if (isAdminGlobal.value) return true; const role = getRoleInProject(task.project); return role === 1 || role === 2 }
+  const canDeleteTask       = (task: any) => { if (isAdminGlobal.value) return true; const role = getRoleInProject(task.project); return role === 1 }
+  const canUpdateStatusOnly = (task: any) => { const role = getRoleInProject(task.project); return role !== null && role !== 4 }
 
   const projectMembers = computed(() => {
     if (!formData.project_id) return []

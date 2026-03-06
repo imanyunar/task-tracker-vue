@@ -14,13 +14,10 @@ use Illuminate\Support\Facades\Storage;
 class UpdateController extends Controller
 {
 
-    // Tambahkan ini di bagian Dynamic Routes di UpdateController.php
 
-/** POST /{model}/{id}/{action} atau POST /{model}/{action} */
 public function action(Request $request, string $model, $id = null, $action = null)
 {
-    // Jika URL-nya /api/profile/avatar, maka $id akan berisi 'avatar' 
-    // dan $action akan null. Kita perlu menghandle pergeseran parameter ini.
+    
     $targetAction = $action ?: $id; 
 
     return match (true) {
@@ -29,11 +26,7 @@ public function action(Request $request, string $model, $id = null, $action = nu
         default => response()->json(['message' => 'Action tidak ditemukan'], 404),
     };
 }
-    // =========================================================================
-    // DYNAMIC ROUTES
-    // =========================================================================
-
-    /** PUT /{model}/{id} */
+    
     public function update(Request $request, string $model, $id)
     {
         return match ($model) {
@@ -75,9 +68,6 @@ public function action(Request $request, string $model, $id = null, $action = nu
         ]);
     }
 
-    // =========================================================================
-    // USER
-    // =========================================================================
 
     private function userUpdate(Request $request, $id)
     {
@@ -103,9 +93,6 @@ public function action(Request $request, string $model, $id = null, $action = nu
         ]);
     }
 
-    // =========================================================================
-    // PROJECT
-    // =========================================================================
 
     private function projectUpdate(Request $request, $id)
     {
@@ -115,7 +102,6 @@ public function action(Request $request, string $model, $id = null, $action = nu
         $member        = $project->members()->where('user_id', $user->id)->first();
         $roleInProject = $member ? $member->pivot->role_in_project : null;
 
-        // Hanya Admin global, Owner, atau Manager project yang boleh edit
         if ((int) $user->role_id !== 1 && $roleInProject !== Project::OWNER && $roleInProject !== Project::MANAGER) {
             return response()->json(['success' => false, 'message' => 'Akses ditolak: Anda bukan Manager/Owner proyek ini'], 403);
         }
@@ -125,9 +111,6 @@ public function action(Request $request, string $model, $id = null, $action = nu
         return response()->json(['success' => true, 'data' => $project]);
     }
 
-    // =========================================================================
-    // TASK
-    // =========================================================================
 
     private function taskUpdate(Request $request, $id)
     {
@@ -157,10 +140,7 @@ public function action(Request $request, string $model, $id = null, $action = nu
         return response()->json(['success' => true, 'task' => $task]);
     }
 
-    // =========================================================================
-    // PROFILE — update nama & email
-    // PUT /profile  (via dynamic route)
-    // =========================================================================
+
 
     private function profileUpdate(Request $request)
     {
@@ -185,10 +165,6 @@ public function action(Request $request, string $model, $id = null, $action = nu
         ]);
     }
 
-    // =========================================================================
-    // PROFILE — ganti password
-    // PUT /profile/password
-    // =========================================================================
 
     public function passwordUpdate(Request $request)
     {
@@ -230,10 +206,7 @@ public function action(Request $request, string $model, $id = null, $action = nu
         ]);
     }
 
-    // =========================================================================
-    // PROFILE — upload avatar
-    // POST /profile/avatar
-    // =========================================================================
+    
 
     public function avatarUpload(Request $request)
     {
@@ -258,7 +231,6 @@ public function action(Request $request, string $model, $id = null, $action = nu
             'public'
         );
 
-        // Simpan full URL ke DB agar konsisten saat fetchProfile
         $fullUrl = asset('storage/' . $path);
         $user->update(['avatar' => $fullUrl]);
         $user->load('department', 'role');

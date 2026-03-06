@@ -7,6 +7,7 @@ import {
   type Ref
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import apiClient from '@/services/api'
 import { PROJECT_ROLES, ROLE_CONFIG } from '@/constants/projectRoles'
 import { useToast } from '@/composables/useToast'
@@ -85,11 +86,8 @@ export function useProjectDetail() {
 
   /* ---- AUTH ---- */
 
-  const currentUser = ref<User>((() => {
-    const raw = sessionStorage.getItem('user_data')
-    if (!raw) return {} as User
-    try { return JSON.parse(raw) as User } catch { return {} as User }
-  })())
+  const authStore = useAuthStore()
+  const currentUser = computed<User>(() => (authStore.user as User) ?? {} as User)
 
   const globalRole = computed<number>(() => {
     const roleId = currentUser.value?.role_id ?? currentUser.value?.role?.id

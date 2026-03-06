@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { taskService } from '../services'
+import apiClient from '../services/api'
 import type { Task } from '../services'
 
 export interface DashboardStats {
@@ -90,7 +91,6 @@ export function useDashboardPage() {
     loading.value = true
     try {
       // Fetch tasks dan projects secara paralel
-      const { default: apiClient } = await import('../services/api')
       const [taskRes, projectRes] = await Promise.all([
         taskService.getAllTasks(),
         apiClient.get('/projects').catch(() => null),
