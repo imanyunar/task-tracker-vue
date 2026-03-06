@@ -1,11 +1,14 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { useProfile } from '../composables/useProfile'
+import { useUserStore } from '../stores'
 import { useToast } from '@/composables/useToast'
 import apiClient from '@/services/api'
 
-const { userStore, loading } = useProfile()
-const toast = useToast()
+const userStore = useUserStore()
+const toast     = useToast()
+const loading   = computed(() => userStore.loading)
+
+onMounted(() => { if (!userStore.profile) userStore.fetchProfile() })
 
 /* ===========================
    TABS

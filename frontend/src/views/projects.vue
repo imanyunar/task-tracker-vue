@@ -392,29 +392,211 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useProjects, roleConfig, statusConfig } from '../composables/useProjects'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+import { useList }   from '@/composables/useList'
+import { useDelete } from '@/composables/useDelete'
+import { useToast }  from '@/composables/useToast'
+import apiClient from '@/services/api'
 
-const {
-  // State
-  loading, searchQuery, departments,
-  showModal, isEditing, isSubmitting, formData,
-  showDetailsModal, activeTab, selectedProject, projectTasks, projectMembers,
-  availableUsers, newMemberId, newMemberRole, isAddingMember,
+const authStore = useAuthStore()
+const router    = useRouter()
+const toast     = useToast()
 
-  // Computed
-  user, projects, canManageGlobal, hasMore,
-  filteredProjects, completedCount, activeCount, plannedCount,
+const user            = computed(() => authStore.user)
+const canManageGlobal = computed(() => user.value?.role_id === 1 || user.value?.role_id === 2)
 
-  // Methods
-  loadMore, openCreateModal, openEditModal, closeModal, submitProject, confirmDelete,
-  openDetails, closeDetailsModal, goToWorkspace, addMember, removeMember, updateMemberRole,
-} = useProjects()
+// ── Config ────────────────────────────────────────────────
+const roleConfig = {
+  1: { label: 'Owner',       class: 'text-rose-400 border-rose-500/30 bg-rose-500/10' },
+  2: { label: 'Manager',     class: 'text-blue-400 border-blue-500/30 bg-blue-500/10' },
+  3: { label: 'Contributor', class: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' },
+  4: { label: 'Stakeholder', class: 'text-slate-400 border-slate-600 bg-slate-800/50' },
+}
+const statusConfig = {
+  planned:     { label: 'Planned',     class: 'bg-slate-700/40 text-slate-300 border-slate-600' },
+  on_progress: { label: 'On Progress', class: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },
+  completed:   { label: 'Completed',   class: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+}
 
-// Users yang belum jadi member di project yang sedang dibuka
+// ── List projects ─────────────────────────────────────────
+const loading     = ref(false)
+const searchQuery = ref('')
+const hasMore     = ref(false)
+const currentPageNum = ref(1)
+const projects    = ref([])
+
+const loadProjects = async (page = 1) => {
+  loading.value = true
+  try {
+    const res  = await apiClient.get('/projects', { params: { page, ...(searchQuery.value && { search: searchQuery.value }) } })
+    const data = res.data?.data ?? res.data
+    const list = Array.isArray(data) ? data : (data?.data ?? [])
+    if (page === 1) projects.value = list
+    else projects.value.push(...list)
+    hasMore.value    = !!res.data?.next_page_url
+    currentPageNum.value = page
+  } catch { toast.error('Gagal memuat proyek.') }
+  finally { loading.value = false }
+}
+
+const loadMore = () => loadProjects(currentPageNum.value + 1)
+
+// ── Departments & Users ───────────────────────────────────
+const { items: departments  } = useList('departments', { immediate: false })
+const { items: availableUsers } = useList('users',    { immediate: false })
+
+// ── Filtered computed ─────────────────────────────────────
+const filteredProjects = computed(() => {
+  if (!searchQuery.value) return projects.value
+  const q = searchQuery.value.toLowerCase()
+  return projects.value.filter(p => p.name?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q))
+})
+const completedCount = computed(() => filteredProjects.value.filter(p => p.status === 'completed').length)
+const activeCount    = computed(() => filteredProjects.value.filter(p => p.status === 'on_progress').length)
+const plannedCount   = computed(() => filteredProjects.value.filter(p => !p.status || p.status === 'planned').length)
+
+// ── Create / Edit modal ───────────────────────────────────
+const showModal    = ref(false)
+const isEditing    = ref(false)
+const isSubmitting = ref(false)
+
+const formData = reactive({
+  id: undefined, name: '', description: '', start_date: '', end_date: '',
+  status: 'planned', department_id: undefined,
+})
+
+const openCreateModal = () => {
+  isEditing.value = false
+  Object.assign(formData, { id: undefined, name: '', description: '', start_date: '', end_date: '', status: 'planned', department_id: user.value?.role_id === 1 ? undefined : user.value?.department_id })
+  showModal.value = true
+}
+
+const openEditModal = (project) => {
+  isEditing.value = true
+  Object.assign(formData, {
+    id: project.id, name: project.name, description: project.description,
+    start_date: project.start_date?.substring(0, 10) ?? '',
+    end_date:   project.end_date?.substring(0, 10)   ?? '',
+    status:        project.status ?? 'planned',
+    department_id: project.department_id,
+  })
+  showModal.value = true
+}
+
+const closeModal = () => { showModal.value = false }
+
+const submitProject = async () => {
+  isSubmitting.value = true
+  try {
+    const { id, ...payload } = formData
+    if (isEditing.value && id !== undefined) {
+      await apiClient.put(`/projects/${id}`, payload)
+      toast.success('Proyek berhasil diperbarui!')
+    } else {
+      await apiClient.post('/projects', payload)
+      toast.success('Proyek berhasil dibuat!')
+    }
+    await loadProjects(1)
+    closeModal()
+  } catch (err) {
+    toast.error(err?.response?.data?.message ?? 'Gagal memproses data.')
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+// ── Delete ────────────────────────────────────────────────
+const { remove: confirmDelete } = useDelete('projects', {
+  confirmTitle:   'Hapus Proyek',
+  confirmMessage: 'Hapus proyek ini secara permanen? Semua data terkait akan hilang.',
+  confirmText:    'Hapus Permanen',
+  successMsg:     'Proyek berhasil dihapus.',
+  onSuccess:      () => loadProjects(1),
+})
+
+// ── Detail modal ──────────────────────────────────────────
+const showDetailsModal = ref(false)
+const activeTab        = ref('tasks')
+const selectedProject  = ref(null)
+const projectTasks     = ref([])
+const projectMembers   = ref([])
+
+const openDetails = async (project) => {
+  selectedProject.value  = project
+  activeTab.value        = 'tasks'
+  showDetailsModal.value = true
+  projectTasks.value     = []
+  projectMembers.value   = []
+  try {
+    const [detailRes, tasksRes] = await Promise.all([
+      apiClient.get(`/projects/${project.id}`),
+      apiClient.get(`/projects/${project.id}/tasks`),
+    ])
+    projectMembers.value = (detailRes.data?.data ?? detailRes.data)?.members ?? []
+    projectTasks.value   = tasksRes.data?.tasks ?? tasksRes.data?.data ?? []
+  } catch { toast.error('Gagal memuat detail proyek.') }
+}
+
+const closeDetailsModal = () => { showDetailsModal.value = false }
+const goToWorkspace     = (id) => router.push({ name: 'ProjectDetail', params: { id: String(id) } })
+
+// ── Members ───────────────────────────────────────────────
+const newMemberId   = ref('')
+const newMemberRole = ref(3)
+const isAddingMember = ref(false)
+
 const availableUsersForProject = computed(() => {
-  const memberIds = new Set(projectMembers.value.map((m: any) => m.id))
-  return availableUsers.value.filter((u: any) => !memberIds.has(u.id))
+  const ids = new Set(projectMembers.value.map(m => m.id))
+  return availableUsers.value.filter(u => !ids.has(u.id))
+})
+
+const addMember = async () => {
+  if (!newMemberId.value || !selectedProject.value) return
+  isAddingMember.value = true
+  try {
+    await apiClient.post(`/projects/${selectedProject.value.id}/members`, { user_id: newMemberId.value, role_in_project: Number(newMemberRole.value) })
+    const res = await apiClient.get(`/projects/${selectedProject.value.id}`)
+    projectMembers.value = (res.data?.data ?? res.data)?.members ?? []
+    newMemberId.value = ''
+    toast.success('Anggota berhasil ditambahkan!')
+  } catch { toast.error('Gagal menambahkan anggota.') }
+  finally { isAddingMember.value = false }
+}
+
+const { remove: removeMember } = useDelete('', {
+  confirmMessage: 'Hapus anggota ini dari proyek?',
+  confirmText:    'Hapus Anggota',
+  successMsg:     'Anggota berhasil dihapus.',
+})
+
+const removeMemberFromProject = async (memberId) => {
+  const ok = await removeMember(memberId, { skipConfirm: false })
+  if (ok) {
+    try {
+      await apiClient.delete(`/projects/${selectedProject.value.id}/members/${memberId}`)
+      projectMembers.value = projectMembers.value.filter(m => m.id !== memberId)
+    } catch { toast.error('Gagal menghapus anggota.') }
+  }
+}
+
+const updateMemberRole = async (memberId, roleId) => {
+  if (!selectedProject.value) return
+  try {
+    await apiClient.post(`/projects/${selectedProject.value.id}/members`, { user_id: memberId, role_in_project: roleId })
+    const m = projectMembers.value.find(m => m.id === memberId)
+    if (m) { if (m.pivot) m.pivot.role_in_project = roleId; m.role_in_project = roleId }
+    toast.success('Role berhasil diperbarui.')
+  } catch { toast.error('Gagal mengubah role.') }
+}
+
+onMounted(async () => {
+  await loadProjects(1)
+  if (canManageGlobal.value) {
+    apiClient.get('/departments').then(r => { departments.value = r.data?.data ?? r.data ?? [] })
+    apiClient.get('/users').then(r => { availableUsers.value = r.data?.data ?? r.data ?? [] })
+  }
 })
 </script>
 

@@ -1,13 +1,47 @@
 <script setup>
-import { useRegister } from '../composables/useRegister'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+import { useList }  from '@/composables/useList'
+import { useToast } from '@/composables/useToast'
 
-const {
-  form,
-  staticDepartments,
-  isSubmitting,
-  notification,
-  handleSubmit
-} = useRegister()
+const authStore = useAuthStore()
+const router    = useRouter()
+const toast     = useToast()
+
+const form = ref({
+  name: '', email: '', password: '', password_confirmation: '', department: '',
+})
+
+const isSubmitting = ref(false)
+
+// departments diambil langsung via useList (bukan staticDepartments lagi)
+const { items: departments } = useList('departments')
+
+const handleSubmit = async () => {
+  const { name, email, password, password_confirmation, department } = form.value
+  if (!name || !email || !password || !department) {
+    toast.warning('Mohon lengkapi seluruh data formulir.')
+    return
+  }
+  if (password !== password_confirmation) {
+    toast.error('Konfirmasi password tidak sesuai.')
+    return
+  }
+  isSubmitting.value = true
+  try {
+    await authStore.register(form.value)
+    toast.success('Registrasi berhasil! Mengalihkan ke Dashboard...')
+    setTimeout(() => router.push('/dashboard'), 1500)
+  } catch (err) {
+    const msg = err?.response?.data?.message
+      ?? err?.response?.data?.errors?.email?.[0]
+      ?? 'Gagal mendaftar. Silakan coba lagi.'
+    toast.error(msg)
+  } finally {
+    isSubmitting.value = false
+  }
+}
 </script>
 
 <template>
@@ -16,35 +50,6 @@ const {
       <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] animate-blob"></div>
       <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
     </div>
-
-    <Transition name="notification">
-      <div v-if="notification.show" class="fixed top-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4">
-        <div :class="[
-          'flex items-center gap-4 p-5 rounded-2xl shadow-2xl border backdrop-blur-xl',
-          notification.type === 'success' 
-            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-            : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-        ]">
-          <div :class="['p-2 rounded-lg', notification.type === 'success' ? 'bg-emerald-500/20' : 'bg-rose-500/20']">
-            <svg v-if="notification.type === 'success'" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div class="flex-1">
-            <h4 class="font-bold text-lg leading-none mb-1">
-              {{ notification.type === 'success' ? 'Berhasil' : 'Perhatian' }}
-            </h4>
-            <p class="text-sm opacity-80 font-medium">{{ notification.message }}</p>
-          </div>
-          <button @click="notification.show = false" class="hover:opacity-70 transition-opacity">
-            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-          </button>
-        </div>
-      </div>
-    </Transition>
 
     <div class="w-full max-w-lg relative z-10 animate-slide-up">
       <div class="bg-slate-900/40 backdrop-blur-2xl border border-slate-800 rounded-[2.5rem] p-10 shadow-2xl">

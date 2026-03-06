@@ -1,15 +1,82 @@
 <script setup>
-import { useDashboardPage } from '../composables/useDashboard'
-// Pastikan file ini ada di: src/composables/useDashboardPage.ts
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useAuthStore } from '../stores/auth'
+import { useList } from '@/composables/useList'
 
-const {
-  stats, allTasks, loading,
-  isViewAll, currentPage,
-  user, greeting, timeString, dateString,
-  displayTasks, totalPages,
-  pendingCount, doingCount, doneCount,
-  toggleViewAll, getStatusConfig, formatDate, isOverdue,
-} = useDashboardPage()
+const authStore = useAuthStore()
+const user      = computed(() => authStore.user)
+
+// ── Fetch data ────────────────────────────────────────────
+const { items: allTasks,    fetch: fetchTasks    } = useList('tasks',    { immediate: false })
+const { items: allProjects, fetch: fetchProjects } = useList('projects', { immediate: false })
+const loading = ref(false)
+const stats   = ref(null)
+
+function hitungStats(tasks, userId, activeProjectCount = 0) {
+  const myTasks  = tasks.filter(t => t.user_id === userId)
+  const myDone   = myTasks.filter(t => t.status === 'done').length
+  const myOnTime = myTasks.filter(t =>
+    t.status === 'done' && t.updated_at && t.due_date &&
+    new Date(t.updated_at) <= new Date(t.due_date)
+  ).length
+  const completionRate = myTasks.length > 0 ? (myDone / myTasks.length) * 100 : 0
+  const timelinessRate = myDone > 0 ? (myOnTime / myDone) * 100 : 0
+  return {
+    total_tasks:     tasks.length,
+    completed_tasks: tasks.filter(t => t.status === 'done').length,
+    pending_tasks:   tasks.filter(t => t.status !== 'done').length,
+    completion_rate: Math.round(completionRate * 10) / 10,
+    timeliness_rate: Math.round(timelinessRate * 10) / 10,
+    kpi_score:       Math.round(((completionRate * 0.6) + (timelinessRate * 0.4)) * 100) / 100,
+    total_projects:  activeProjectCount,
+  }
+}
+
+const loadDashboard = async () => {
+  loading.value = true
+  await Promise.all([fetchTasks(), fetchProjects()])
+  const activeCount = allProjects.value.filter(p => p.status === 'on_progress' || p.status === 'planned').length
+  stats.value   = hitungStats(allTasks.value, user.value?.id ?? 0, activeCount)
+  loading.value = false
+}
+
+// ── Clock ─────────────────────────────────────────────────
+const currentTime = ref(new Date())
+let timer = null
+const greeting   = computed(() => { const h = currentTime.value.getHours(); return h < 11 ? 'Selamat Pagi' : h < 15 ? 'Selamat Siang' : h < 18 ? 'Selamat Sore' : 'Selamat Malam' })
+const timeString = computed(() => currentTime.value.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+const dateString = computed(() => currentTime.value.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))
+
+// ── Pagination ────────────────────────────────────────────
+const isViewAll    = ref(false)
+const currentPage  = ref(1)
+const itemsPerPage = 8
+
+const displayTasks = computed(() => {
+  if (!isViewAll.value) return allTasks.value.slice(0, 6)
+  const s = (currentPage.value - 1) * itemsPerPage
+  return allTasks.value.slice(s, s + itemsPerPage)
+})
+const totalPages   = computed(() => Math.ceil(allTasks.value.length / itemsPerPage))
+const pendingCount = computed(() => allTasks.value.filter(t => t.status === 'todo').length)
+const doingCount   = computed(() => allTasks.value.filter(t => t.status === 'doing').length)
+const doneCount    = computed(() => allTasks.value.filter(t => t.status === 'done').length)
+const toggleViewAll = () => { isViewAll.value = !isViewAll.value; currentPage.value = 1 }
+
+// ── Helpers ───────────────────────────────────────────────
+const getStatusConfig = (s) => {
+  const m = { done: { color: 'badge-success', label: 'Selesai' }, doing: { color: 'badge-primary', label: 'Proses' }, review: { color: 'badge-warning', label: 'Review' } }
+  return m[s?.toLowerCase()] ?? { color: 'badge-danger', label: s || 'Todo' }
+}
+const formatDate = (d) => d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
+const isOverdue  = (d) => !!d && new Date(d) < new Date()
+
+onMounted(async () => {
+  timer = setInterval(() => { currentTime.value = new Date() }, 1000)
+  if (!authStore.user) await authStore.fetchProfile().catch(console.error)
+  await loadDashboard()
+})
+onUnmounted(() => { if (timer) clearInterval(timer) })
 </script>
 
 <template>

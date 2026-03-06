@@ -481,71 +481,218 @@
 
 
 <script setup>
-import { ref, reactive, watch } from 'vue'
-import { useProjectDetail } from '@/composables/useProjectDetail'
+import { ref, reactive, computed, watch, nextTick, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { useShow }    from '@/composables/useShow'
+import { useList }    from '@/composables/useList'
+import { useDelete }  from '@/composables/useDelete'
+import { useToast }   from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
 import apiClient from '@/services/api'
-import { useToast } from '@/composables/useToast'
 
-const {
-  project,
-  loading,
-  currentTab,
-  isEditingProject,
-  newMessage,
-  isSubmitting,
-  newChatMessage,
-  chatMessages,
-  chatContainer,
-  currentUser,
-  canManageProject,
-  canDeleteProject,
-  canPostContent,
-  canChat,
-  totalTaskCount,
-  doneTaskCount,
-  taskProgressPercent,
-  tabs,
-  formatDate,
-  formatTime,
-  getMemberRoleName,
-  getMemberRoleClass,
-  currentRoleLabel,
-  currentRoleClass,
-  postToStream,
-  deletePost,
-  sendChatMessage,
-  handleDeleteProject,
-  removeMember,
-  updateMemberRole,
-  availableUsers,
-  newMemberId,
-  newMemberRole,
-  isAddingMember,
-  addMember,
-  showTaskModal,
-  isSubmittingTask,
-  taskForm,
-  openTaskModal,
-  closeTaskModal,
-  saveTask,
-} = useProjectDetail()
+const route   = useRoute()
+const router  = useRouter()
+const authStore = useAuthStore()
+const toast     = useToast()
+const { confirm } = useConfirm()
 
-const toast = useToast()
-
-// ===== EDIT PROJECT MODAL =====
-const showEditModal = ref(false)
-const isSavingEdit = ref(false)
-const isLoadingUsers = ref(false)
-
-const editForm = reactive({
-  name: '',
-  description: '',
-  start_date: '',
-  end_date: '',
-  status: 'planned',
+// ── Fetch project ─────────────────────────────────────────
+const { item: project, loading, fetch: fetchProject } = useShow('projects', {
+  onError: () => router.push('/projects'),
 })
 
-// Isi form dari data project saat ini
+watch(() => route.params.id, id => { if (id) fetchProject(id) }, { immediate: true })
+
+// ── Auth / role ───────────────────────────────────────────
+const currentUser = computed(() => authStore.user)
+const PROJECT_ROLES = { OWNER: 1, MANAGER: 2, CONTRIBUTOR: 3, STAKEHOLDER: 4 }
+const ROLE_CONFIG = {
+  1: { label: 'Owner',       color: 'text-rose-400 border-rose-500/30 bg-rose-500/10' },
+  2: { label: 'Manager',     color: 'text-blue-400 border-blue-500/30 bg-blue-500/10' },
+  3: { label: 'Contributor', color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' },
+  4: { label: 'Stakeholder', color: 'text-slate-400 border-slate-600 bg-slate-800/50' },
+}
+
+const globalRole = computed(() => Number(currentUser.value?.role_id ?? currentUser.value?.role?.id ?? 99))
+
+const currentRoleId = computed(() => {
+  if (globalRole.value === 1 || globalRole.value === 2) return PROJECT_ROLES.OWNER
+  const m   = project.value?.members?.find(m => String(m.id) === String(currentUser.value?.id))
+  const raw = m?.role_in_project ?? m?.pivot?.role_in_project
+  if (raw == null || raw === '') return null
+  const id  = Number(raw)
+  return ROLE_CONFIG[id] ? id : null
+})
+
+const canManageProject = computed(() => currentRoleId.value === 1 || currentRoleId.value === 2)
+const canDeleteProject = computed(() => currentRoleId.value === 1)
+const canPostContent   = computed(() => currentRoleId.value !== null && currentRoleId.value !== 4)
+const canChat          = computed(() => currentRoleId.value !== null)
+
+const getRoleId          = (m) => { const raw = m?.role_in_project ?? m?.pivot?.role_in_project; if (raw == null) return null; const id = Number(raw); return ROLE_CONFIG[id] ? id : null }
+const getMemberRoleName  = (m) => { const id = getRoleId(m); return id !== null ? ROLE_CONFIG[id].label : 'Tamu' }
+const getMemberRoleClass = (m) => { const id = getRoleId(m); return id !== null ? ROLE_CONFIG[id].color : 'text-slate-500 border-slate-700 bg-slate-800' }
+const currentRoleLabel   = computed(() => currentRoleId.value !== null ? ROLE_CONFIG[currentRoleId.value].label : 'Tamu')
+const currentRoleClass   = computed(() => currentRoleId.value !== null ? ROLE_CONFIG[currentRoleId.value].color : 'text-slate-500 border-slate-700 bg-slate-800')
+
+// ── Tabs & stats ──────────────────────────────────────────
+const currentTab = ref('stream')
+const tabs = [
+  { key: 'stream', label: 'Forum',  icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
+  { key: 'chat',   label: 'Chat',   icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z' },
+  { key: 'tasks',  label: 'Tugas',  icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+  { key: 'people', label: 'Tim',    icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+]
+
+const totalTaskCount      = computed(() => project.value?.tasks?.length ?? 0)
+const doneTaskCount       = computed(() => project.value?.tasks?.filter(t => t.status === 'done').length ?? 0)
+const taskProgressPercent = computed(() => totalTaskCount.value === 0 ? 0 : Math.round((doneTaskCount.value / totalTaskCount.value) * 100))
+
+const formatDate = (d) => d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
+const formatTime = (d) => d ? new Date(d).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : ''
+
+// ── Stream (posts) ────────────────────────────────────────
+const newMessage   = ref('')
+const isSubmitting = ref(false)
+
+const postToStream = async () => {
+  if (!newMessage.value.trim() || !project.value) return
+  isSubmitting.value = true
+  try {
+    const res = await apiClient.post(`/projects/${route.params.id}/posts`, { content: newMessage.value })
+    if (!project.value.posts) project.value.posts = []
+    project.value.posts.unshift(res.data?.data ?? res.data)
+    newMessage.value = ''
+  } catch { toast.error('Gagal memposting.') }
+  finally { isSubmitting.value = false }
+}
+
+const { remove: deletePost } = useDelete(`projects/${route.params.id}/posts`, {
+  confirmMessage: 'Hapus postingan ini?',
+  successMsg:     'Postingan berhasil dihapus.',
+  onSuccess:      (id) => { if (project.value) project.value.posts = project.value.posts?.filter(p => p.id !== id) },
+})
+
+// ── Chat ──────────────────────────────────────────────────
+const chatMessages   = ref([])
+const newChatMessage = ref('')
+const chatContainer  = ref(null)
+let chatInterval     = null
+let isFetchingChat   = false
+
+const scrollToBottom = () =>
+  nextTick(() => { if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight })
+
+const fetchChatMessages = async () => {
+  if (isFetchingChat) return
+  isFetchingChat = true
+  try {
+    const res = await apiClient.get(`/projects/${route.params.id}/chats`)
+    chatMessages.value = res.data?.data ?? res.data
+    const el = chatContainer.value
+    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 120) scrollToBottom()
+  } finally { isFetchingChat = false }
+}
+
+const sendChatMessage = async () => {
+  if (!newChatMessage.value.trim()) return
+  const msg = newChatMessage.value
+  newChatMessage.value = ''
+  try {
+    const res = await apiClient.post(`/projects/${route.params.id}/chats`, { message: msg })
+    chatMessages.value.push(res.data?.data ?? res.data)
+    scrollToBottom()
+  } catch { toast.error('Gagal mengirim pesan.'); newChatMessage.value = msg }
+}
+
+// ── Members ───────────────────────────────────────────────
+const { items: allUsers, fetch: fetchAllUsers } = useList('users', { immediate: false })
+
+const availableUsers = computed(() => {
+  const ids = new Set(project.value?.members?.map(m => m.id) ?? [])
+  return allUsers.value.filter(u => !ids.has(u.id))
+})
+
+const newMemberId    = ref('')
+const newMemberRole  = ref(3)
+const isAddingMember = ref(false)
+
+const addMember = async () => {
+  if (!newMemberId.value || !project.value) return
+  isAddingMember.value = true
+  try {
+    await apiClient.post(`/projects/${route.params.id}/members`, { user_id: newMemberId.value, role_in_project: newMemberRole.value })
+    const u = allUsers.value.find(u => u.id === newMemberId.value)
+    if (u) { if (!project.value.members) project.value.members = []; project.value.members.push({ ...u, pivot: { role_in_project: newMemberRole.value } }) }
+    toast.success('Anggota berhasil ditambahkan!')
+    newMemberId.value  = ''
+    newMemberRole.value = 3
+  } catch { toast.error('Gagal menambahkan anggota.') }
+  finally { isAddingMember.value = false }
+}
+
+const { remove: removeMember } = useDelete(`projects/${route.params.id}/members`, {
+  confirmMessage: 'Keluarkan anggota ini dari proyek?',
+  confirmText:    'Keluarkan',
+  successMsg:     'Anggota berhasil dikeluarkan.',
+  onSuccess:      (id) => { if (project.value) project.value.members = project.value.members?.filter(m => m.id !== id) },
+})
+
+const updateMemberRole = async (memberId, roleId) => {
+  try {
+    await apiClient.post(`/projects/${route.params.id}/members`, { user_id: memberId, role_in_project: roleId })
+    const m = project.value?.members?.find(m => m.id === memberId)
+    if (m) { m.role_in_project = roleId; if (m.pivot) m.pivot.role_in_project = roleId }
+    toast.success('Role berhasil diperbarui.')
+  } catch { toast.error('Gagal mengubah role.') }
+}
+
+// ── Task modal ────────────────────────────────────────────
+const showTaskModal    = ref(false)
+const isSubmittingTask = ref(false)
+const taskForm         = ref({ title: '', description: '', priority: 'medium', status: 'todo', due_date: '', user_id: '' })
+
+const openTaskModal  = () => { Object.assign(taskForm.value, { title: '', description: '', priority: 'medium', status: 'todo', due_date: '', user_id: '' }); showTaskModal.value = true }
+const closeTaskModal = () => { showTaskModal.value = false }
+
+const saveTask = async () => {
+  if (!taskForm.value.title.trim() || !taskForm.value.due_date || !taskForm.value.user_id) return
+  isSubmittingTask.value = true
+  try {
+    const res = await apiClient.post(`/projects/${route.params.id}/tasks`, { ...taskForm.value, project_id: route.params.id })
+    if (!project.value.tasks) project.value.tasks = []
+    project.value.tasks.push(res.data?.data ?? res.data)
+    toast.success('Tugas berhasil dibuat!')
+    closeTaskModal()
+  } catch { toast.error('Gagal membuat tugas.') }
+  finally { isSubmittingTask.value = false }
+}
+
+// ── Delete project ────────────────────────────────────────
+const handleDeleteProject = async () => {
+  const ok = await confirm({
+    title:       'Hapus Proyek',
+    message:     'Hapus seluruh proyek ini secara permanen? Semua tugas dan data akan hilang.',
+    type:        'danger',
+    confirmText: 'Hapus Proyek',
+  })
+  if (!ok) return
+  try {
+    await apiClient.delete(`/projects/${route.params.id}`)
+    toast.success('Proyek berhasil dihapus.')
+    router.push('/projects')
+  } catch { toast.error('Gagal menghapus proyek.') }
+}
+
+// ── Edit project modal ────────────────────────────────────
+const isEditingProject = ref(false)
+const showEditModal    = ref(false)
+const isSavingEdit     = ref(false)
+const isLoadingUsers   = ref(false)
+
+const editForm = reactive({ name: '', description: '', start_date: '', end_date: '', status: 'planned' })
+
 const openEditModal = () => {
   if (!project.value) return
   editForm.name        = project.value.name        || ''
@@ -556,38 +703,38 @@ const openEditModal = () => {
   showEditModal.value  = true
 }
 
-const closeEditModal = () => {
-  showEditModal.value = false
-}
+const closeEditModal = () => { showEditModal.value = false }
 
 const submitEdit = async () => {
   if (!project.value) return
   isSavingEdit.value = true
   try {
-    const res = await apiClient.put(`/projects/${project.value.id}`, editForm)
+    const res     = await apiClient.put(`/projects/${project.value.id}`, editForm)
     const updated = res.data.data ?? res.data
-    // Update data project lokal tanpa reload halaman
     Object.assign(project.value, updated)
     toast.success('Proyek berhasil diperbarui!')
     closeEditModal()
-  } catch (err) {
-    console.error('Gagal menyimpan edit:', err)
-    toast.error('Gagal menyimpan perubahan.')
-  } finally {
-    isSavingEdit.value = false
-  }
+  } catch { toast.error('Gagal menyimpan perubahan.') }
+  finally { isSavingEdit.value = false }
 }
 
-// ===== FETCH USERS saat tab people dibuka =====
-// Tambah loading state agar select tidak kosong diam-diam
+// ── Watchers ──────────────────────────────────────────────
 watch(currentTab, async (val) => {
-  if (val === 'people' && availableUsers.value.length === 0) {
+  if (val === 'chat') {
+    fetchChatMessages()
+    chatInterval = setInterval(fetchChatMessages, 4000)
+  } else {
+    if (chatInterval) { clearInterval(chatInterval); chatInterval = null }
+  }
+  if (val === 'people') {
+    fetchAllUsers()
     isLoadingUsers.value = true
-    // Beri waktu fetchAllUsers di composable selesai
-    await new Promise(resolve => setTimeout(resolve, 300))
+    await new Promise(r => setTimeout(r, 300))
     isLoadingUsers.value = false
   }
 })
+
+onUnmounted(() => { if (chatInterval) clearInterval(chatInterval) })
 </script>
 
 

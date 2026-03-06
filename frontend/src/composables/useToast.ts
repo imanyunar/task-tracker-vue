@@ -9,7 +9,6 @@ export interface Toast {
   duration: number
 }
 
-// Singleton state — satu instance untuk seluruh app
 const toasts = ref<Toast[]>([])
 let nextId = 0
 

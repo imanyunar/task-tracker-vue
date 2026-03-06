@@ -8,7 +8,6 @@ interface ConfirmOptions {
   type?: 'danger' | 'warning' | 'info'
 }
 
-// Singleton state
 const visible   = ref(false)
 const options   = ref<ConfirmOptions>({ message: '' })
 let resolveFn: ((val: boolean) => void) | null = null
@@ -17,9 +16,7 @@ export function useConfirm() {
   const confirm = (opts: ConfirmOptions | string): Promise<boolean> => {
     options.value = typeof opts === 'string' ? { message: opts } : opts
     visible.value = true
-    return new Promise((resolve) => {
-      resolveFn = resolve
-    })
+    return new Promise((resolve) => { resolveFn = resolve })
   }
 
   const onConfirm = () => {

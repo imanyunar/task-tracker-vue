@@ -108,22 +108,79 @@
 </template>
 
 <script setup>
-import { useProjectChat } from '../composables/useProjectChat'
+import { ref, computed, nextTick, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+import { useShow }  from '@/composables/useShow'
+import { useToast } from '@/composables/useToast'
+import apiClient from '@/services/api'
 
-const {
-  project,
-  loading,
-  isSubmitting,
-  currentTab,
-  newPostContent,
-  chatMessages,
-  newChatMessage,
-  chatContainer,
-  currentUser,
-  managers,
-  handleSendPost,
-  handleSendChat,
-} = useProjectChat()
+const route     = useRoute()
+const authStore = useAuthStore()
+const toast     = useToast()
+const projectId = computed(() => Number(route.params.id))
+
+// ── Project info ──────────────────────────────────────────
+const { item: project, loading } = useShow('projects', { id: projectId.value })
+
+const currentUser = computed(() => authStore.user)
+const managers    = computed(() =>
+  project.value?.members?.filter(m => (m.pivot?.role_in_project ?? m.role_in_project) <= 2) ?? []
+)
+
+// ── Chat ──────────────────────────────────────────────────
+const chatMessages   = ref([])
+const newChatMessage = ref('')
+const chatContainer  = ref(null)
+let lastId = 0
+
+const scrollToBottom = () =>
+  nextTick(() => { if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight })
+
+const fetchMessages = async () => {
+  try {
+    const res  = await apiClient.get(`/projects/${projectId.value}/chats`, { params: { last_id: lastId } })
+    const data = Array.isArray(res.data) ? res.data : res.data?.data ?? []
+    if (data.length > 0) {
+      chatMessages.value.push(...data)
+      lastId = data[data.length - 1].id
+      scrollToBottom()
+    }
+  } catch (err) { toast.error(err?.message ?? 'Gagal memuat pesan.') }
+}
+
+const handleSendChat = async () => {
+  if (!newChatMessage.value.trim()) return
+  const msg = newChatMessage.value
+  newChatMessage.value = ''
+  try {
+    const res = await apiClient.post(`/projects/${projectId.value}/chats`, { message: msg })
+    chatMessages.value.push(res.data?.data ?? res.data)
+    lastId = chatMessages.value[chatMessages.value.length - 1].id
+    scrollToBottom()
+  } catch { toast.error('Gagal mengirim pesan.'); newChatMessage.value = msg }
+}
+
+// ── Forum / Post ──────────────────────────────────────────
+const newPostContent = ref('')
+const isSubmitting   = ref(false)
+const currentTab     = ref('forum')
+
+const handleSendPost = async () => {
+  if (!newPostContent.value.trim()) return
+  isSubmitting.value = true
+  try {
+    const res = await apiClient.post(`/projects/${projectId.value}/posts`, { content: newPostContent.value })
+    if (project.value) {
+      if (!project.value.posts) project.value.posts = []
+      project.value.posts.unshift(res.data?.data ?? res.data)
+    }
+    newPostContent.value = ''
+  } catch { toast.error('Gagal mengirim post.') }
+  finally { isSubmitting.value = false }
+}
+
+onMounted(fetchMessages)
 </script>
 
 <style scoped>

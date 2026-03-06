@@ -1,8 +1,7 @@
 import { defineStore } from 'pinia'
-import { taskService } from '../services'
-import type { Task } from '../services'  // ← import langsung dari services, tidak define ulang
+import apiClient from '@/services/api'
+import type { Task } from '@/services'
 
-// Stats dihitung di frontend dari data tasks — tidak dari backend
 interface DashboardStats {
   total_tasks: number
   completed_tasks: number
@@ -19,29 +18,23 @@ interface TaskState {
 }
 
 function hitungStats(tasks: Task[], userId: number): DashboardStats {
-  const totalTasks     = tasks.length
-  const completedTasks = tasks.filter(t => t.status === 'done').length
-  const pendingTasks   = tasks.filter(t => t.status !== 'done').length
-
   const myTasks  = tasks.filter(t => t.user_id === userId)
-  const myTotal  = myTasks.length
   const myDone   = myTasks.filter(t => t.status === 'done').length
   const myOnTime = myTasks.filter(t => {
     if (t.status !== 'done' || !t.updated_at || !t.due_date) return false
     return new Date(t.updated_at) <= new Date(t.due_date)
   }).length
 
-  const completionRate = myTotal > 0 ? (myDone / myTotal) * 100 : 0
-  const timelinessRate = myDone  > 0 ? (myOnTime / myDone) * 100 : 0
-  const kpiScore       = (completionRate * 0.6) + (timelinessRate * 0.4)
+  const completionRate = myTasks.length > 0 ? (myDone / myTasks.length) * 100 : 0
+  const timelinessRate = myDone > 0 ? (myOnTime / myDone) * 100 : 0
 
   return {
-    total_tasks:     totalTasks,
-    completed_tasks: completedTasks,
-    pending_tasks:   pendingTasks,
+    total_tasks:     tasks.length,
+    completed_tasks: tasks.filter(t => t.status === 'done').length,
+    pending_tasks:   tasks.filter(t => t.status !== 'done').length,
     completion_rate: Math.round(completionRate * 10) / 10,
     timeliness_rate: Math.round(timelinessRate * 10) / 10,
-    kpi_score:       Math.round(kpiScore * 100) / 100,
+    kpi_score:       Math.round(((completionRate * 0.6) + (timelinessRate * 0.4)) * 100) / 100,
   }
 }
 
@@ -56,26 +49,25 @@ export const useTaskStore = defineStore('task', {
     async fetchTasks(userId: number) {
       this.loading = true
       try {
-        const res   = await taskService.getAllTasks()
+        const res   = await apiClient.get('/tasks')
         const data  = (res.data as any).data || res.data
         const tasks = Array.isArray(data) ? data : []
-
-        this.tasks = tasks
-        this.stats = hitungStats(tasks, userId)
+        this.tasks  = tasks
+        this.stats  = hitungStats(tasks, userId)
       } finally {
         this.loading = false
       }
     },
 
     async createTask(taskData: Partial<Task>) {
-      const res  = await taskService.createTask(taskData)
+      const res  = await apiClient.post('/tasks', taskData)
       const data = (res.data as any).task || (res.data as any).data || res.data
       this.tasks.push(data)
       return data
     },
 
     async updateTask(id: number, taskData: Partial<Task>) {
-      const res   = await taskService.updateTask(id, taskData)
+      const res   = await apiClient.put(`/tasks/${id}`, taskData)
       const data  = (res.data as any).task || (res.data as any).data || res.data
       const index = this.tasks.findIndex(t => t.id === id)
       if (index !== -1) this.tasks[index] = data
@@ -83,7 +75,7 @@ export const useTaskStore = defineStore('task', {
     },
 
     async deleteTask(id: number) {
-      await taskService.deleteTask(id)
+      await apiClient.delete(`/tasks/${id}`)
       this.tasks = this.tasks.filter(t => t.id !== id)
     },
   },

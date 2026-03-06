@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { projectService } from '../services'
-import type { Project } from '../services'  // ← import dari services
+import apiClient from '@/services/api'
+import type { Project } from '@/services'
 
 interface ProjectState {
   projects: Project[]
@@ -31,7 +31,9 @@ export const useProjectStore = defineStore('project', {
     async fetchProjects(page = 1, search = '') {
       this.loading = true
       try {
-        const res  = await projectService.getAllProjects(page, search)
+        const res  = await apiClient.get('/projects', {
+          params: { page, ...(search !== '' && { search }) },
+        })
         const data = (res.data as any).data || res.data
         const list = Array.isArray(data) ? data : []
         this.projects = list.map((p: any) => withProgress(p))
@@ -43,7 +45,7 @@ export const useProjectStore = defineStore('project', {
     async getProjectById(id: number) {
       this.loading = true
       try {
-        const res  = await projectService.getProjectById(id)
+        const res  = await apiClient.get(`/projects/${id}`)
         const data = (res.data as any).data || res.data
         this.currentProject = withProgress(data)
       } finally {
@@ -54,7 +56,7 @@ export const useProjectStore = defineStore('project', {
     async createProject(projectData: Partial<Project>) {
       this.loading = true
       try {
-        const res     = await projectService.createProject(projectData)
+        const res     = await apiClient.post('/projects', projectData)
         const data    = (res.data as any).data || res.data
         const project = withProgress(data)
         this.projects.push(project)
@@ -67,7 +69,7 @@ export const useProjectStore = defineStore('project', {
     async updateProject(id: number, projectData: Partial<Project>) {
       this.loading = true
       try {
-        const res     = await projectService.updateProject(id, projectData)
+        const res     = await apiClient.put(`/projects/${id}`, projectData)
         const data    = (res.data as any).data || res.data
         const project = withProgress(data)
         const index   = this.projects.findIndex(p => p.id === id)
@@ -81,7 +83,7 @@ export const useProjectStore = defineStore('project', {
     async deleteProject(id: number) {
       this.loading = true
       try {
-        await projectService.deleteProject(id)
+        await apiClient.delete(`/projects/${id}`)
         this.projects = this.projects.filter(p => p.id !== id)
       } finally {
         this.loading = false

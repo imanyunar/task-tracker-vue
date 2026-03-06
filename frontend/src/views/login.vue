@@ -1,7 +1,31 @@
 <script setup lang="ts">
-import { useLogin } from '../composables/useLogin'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+import { useToast } from '@/composables/useToast'
 
-const { email, password, loading, notification, handleLogin } = useLogin()
+const authStore = useAuthStore()
+const router    = useRouter()
+const toast     = useToast()
+
+const email    = ref('')
+const password = ref('')
+const loading  = ref(false)
+
+const handleLogin = async () => {
+  loading.value = true
+  try {
+    const ok = await authStore.login({ email: email.value, password: password.value })
+    if (ok) {
+      toast.success('Login berhasil!')
+      router.replace({ name: 'Dashboard' })
+    }
+  } catch {
+    toast.error('Email atau password salah.')
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <template>
@@ -11,28 +35,6 @@ const { email, password, loading, notification, handleLogin } = useLogin()
     <div class="fixed top-0 -left-10 w-[500px] h-[500px] bg-indigo-600/8 rounded-full filter blur-[120px] animate-blob pointer-events-none"></div>
     <div class="fixed -bottom-20 -right-10 w-[500px] h-[500px] bg-purple-600/8 rounded-full filter blur-[120px] animate-blob animation-delay-2000 pointer-events-none"></div>
     <div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-indigo-900/10 rounded-full filter blur-[100px] pointer-events-none"></div>
-
-    <!-- Notification -->
-    <Transition name="slide">
-      <div
-        v-if="notification.show"
-        :class="[
-          'fixed top-6 right-6 z-50 flex items-start gap-3 px-4 py-3.5 rounded-2xl border shadow-2xl backdrop-blur-xl',
-          notification.type === 'success'
-            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-            : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
-        ]"
-      >
-        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-          <path v-if="notification.type === 'success'" fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-          <path v-else fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-        </svg>
-        <div>
-          <p class="font-bold text-sm">{{ notification.type === 'success' ? 'Berhasil' : 'Gagal' }}</p>
-          <p class="text-xs opacity-80 mt-0.5">{{ notification.message }}</p>
-        </div>
-      </div>
-    </Transition>
 
     <!-- Login Card -->
     <div class="w-full max-w-md relative z-10 animate-slide-up">

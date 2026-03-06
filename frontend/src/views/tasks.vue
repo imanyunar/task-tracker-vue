@@ -221,15 +221,151 @@
 </template>
 
 <script setup lang="ts">
-import { useTasksDashboard } from '../composables/useTasks'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useAuthStore } from '../stores/auth'
+import { useList }   from '@/composables/useList'
+import { useDelete } from '@/composables/useDelete'
+import { useToast }  from '@/composables/useToast'
+import apiClient from '@/services/api'
 
-const {
-  loading, searchQuery, showModal, editingTask, filterStatus, formData,
-  canCreateAnyTask, projectMembers, taskCounts, filteredTasks, projects,
-  canEditFullTask, canDeleteTask, canUpdateStatusOnly, onProjectChange,
-  getStatusLabel, statusBadgeClass, priorityBadgeClass, openModal, closeModal,
-  saveTask, handleQuickUpdate, deleteTask
-} = useTasksDashboard()
+const authStore = useAuthStore()
+const toast     = useToast()
+const user      = computed(() => authStore.user)
+
+const isAdminGlobal   = computed(() => user.value?.role_id === 1)
+const isManagerGlobal = computed(() => user.value?.role_id === 2)
+
+// ── Fetch ─────────────────────────────────────────────────
+const { items: tasks,    fetch: fetchTasks    } = useList('tasks',    { immediate: false })
+const { items: projects, fetch: fetchProjects } = useList('projects', { immediate: false })
+const loading = ref(false)
+
+const fetchAllData = async () => {
+  loading.value = true
+  await Promise.all([fetchTasks(), fetchProjects()])
+  loading.value = false
+}
+
+// ── Filter ────────────────────────────────────────────────
+const searchQuery  = ref('')
+const filterStatus = ref('')
+
+const filteredTasks = computed(() => {
+  let res = tasks.value.filter(t =>
+    t.title?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+    t.description?.toLowerCase().includes(searchQuery.value.toLowerCase())
+  )
+  if (filterStatus.value) res = res.filter(t => t.status === filterStatus.value)
+  return res
+})
+
+const taskCounts = computed(() => ({
+  todo:   tasks.value.filter(t => t.status === 'todo').length,
+  doing:  tasks.value.filter(t => t.status === 'doing').length,
+  review: tasks.value.filter(t => t.status === 'review').length,
+  done:   tasks.value.filter(t => t.status === 'done').length,
+}))
+
+// ── Permissions ───────────────────────────────────────────
+const getRoleInProject = (project) => {
+  if (!project?.members) return null
+  const m   = project.members.find(m => m.id === user.value?.id)
+  const raw = m?.pivot?.role_in_project ?? m?.role_in_project
+  return raw != null ? Number(raw) : null
+}
+
+const canCreateAnyTask = computed(() =>
+  isAdminGlobal.value || isManagerGlobal.value ||
+  projects.value.some(p => { const r = getRoleInProject(p); return r === 1 || r === 2 })
+)
+const canEditFullTask     = (task) => { if (isAdminGlobal.value) return true; const r = getRoleInProject(task.project); return r === 1 || r === 2 }
+const canDeleteTask       = (task) => { if (isAdminGlobal.value) return true; return getRoleInProject(task.project) === 1 }
+const canUpdateStatusOnly = (task) => { const r = getRoleInProject(task.project); return r !== null && r !== 4 }
+
+// ── Form ──────────────────────────────────────────────────
+const showModal   = ref(false)
+const editingTask = ref(null)
+
+const formData = reactive({
+  title: '', description: '', priority: 'medium', status: 'todo',
+  project_id: '' as string | number, user_id: '' as string | number, due_date: '',
+})
+
+const projectMembers = computed(() => {
+  if (!formData.project_id) return []
+  return projects.value.find(p => p.id === formData.project_id)?.members || []
+})
+
+const onProjectChange = () => { formData.user_id = '' }
+
+const openModal = (task = null) => {
+  if (task) {
+    editingTask.value = task
+    const d = task.due_date ? new Date(task.due_date) : null
+    Object.assign(formData, {
+      title: task.title, description: task.description, priority: task.priority,
+      status: task.status, project_id: task.project_id, user_id: task.user_id,
+      due_date: d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '',
+    })
+  } else {
+    editingTask.value = null
+    Object.assign(formData, { title: '', description: '', priority: 'medium', status: 'todo', project_id: '', user_id: '', due_date: '' })
+  }
+  showModal.value = true
+}
+
+const closeModal = () => { showModal.value = false; editingTask.value = null }
+
+// ── Save task ─────────────────────────────────────────────
+const saveTask = async () => {
+  if (!formData.due_date) { toast.warning('Deadline wajib diisi.'); return }
+  const payload = { ...formData, project_id: Number(formData.project_id), user_id: Number(formData.user_id) }
+  try {
+    if (editingTask.value) {
+      await apiClient.put(`/tasks/${editingTask.value.id}`, payload)
+      toast.success('Tugas berhasil diperbarui!')
+    } else {
+      await apiClient.post('/tasks', payload)
+      toast.success('Tugas berhasil dibuat!')
+    }
+    closeModal()
+    await fetchAllData()
+  } catch (err) {
+    toast.error('Gagal: ' + (err?.response?.data?.message ?? err.message))
+  }
+}
+
+// ── Quick status update ───────────────────────────────────
+const handleQuickUpdate = async (task, newStatus) => {
+  try {
+    await apiClient.put(`/tasks/${task.id}`, { status: newStatus })
+    task.status = newStatus
+    toast.success('Status tugas diperbarui.')
+  } catch {
+    toast.error('Gagal update status.')
+    await fetchAllData()
+  }
+}
+
+// ── Delete ────────────────────────────────────────────────
+const { remove: deleteTask } = useDelete('tasks', {
+  confirmMessage: 'Hapus tugas ini secara permanen?',
+  confirmText:    'Hapus Tugas',
+  successMsg:     'Tugas berhasil dihapus.',
+  onSuccess:      (id) => { tasks.value = tasks.value.filter(t => t.id !== id) },
+})
+
+// ── Helpers ───────────────────────────────────────────────
+const getStatusLabel = (s) => ({ todo: 'To Do', doing: 'Doing', review: 'Review', done: 'Done' }[s] ?? s)
+const statusBadgeClass   = (s) => ({ done: 'badge-success', doing: 'badge-primary', review: 'badge-warning', todo: 'badge-danger' }[s] ?? 'badge-danger')
+const priorityBadgeClass = (p) => ({
+  low:    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  medium: 'bg-amber-500/10  text-amber-400  border-amber-500/20',
+  high:   'bg-rose-500/10   text-rose-400   border-rose-500/20',
+  urgent: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+}[p] ?? 'bg-slate-700/30 text-slate-400 border-slate-700')
+
+onMounted(fetchAllData)
 </script>
 
 <style scoped>
