@@ -23,6 +23,8 @@ public function action(Request $request, string $model, $id = null, $action = nu
     return match (true) {
         $model === 'profile' && $targetAction === 'avatar'   => $this->avatarUpload($request),
         $model === 'profile' && $targetAction === 'password' => $this->passwordUpdate($request),
+        $model === 'users' && $targetAction === 'deactivate' => $this->deactivate($request, $id),
+        $model === 'users' && $targetAction === 'restore'    => $this->restore($request, $id),
         default => response()->json(['message' => 'Action tidak ditemukan'], 404),
     };
 }
@@ -39,9 +41,7 @@ public function action(Request $request, string $model, $id = null, $action = nu
         };
     }
 
-    // =========================================================================
-    // DEPARTMENT
-    // =========================================================================
+    
 
     private function departmentUpdate(Request $request, $id)
     {
@@ -71,29 +71,71 @@ public function action(Request $request, string $model, $id = null, $action = nu
 
     private function userUpdate(Request $request, $id)
     {
+        if ($request->user()->role_id > 1) {
+            return response()->json(['message' => 'Hanya Admin'], 403);
+        }
+
         $user = User::find($id);
 
         if (!$user) {
             return response()->json(['message' => 'User tidak ditemukan'], 404);
         }
 
-        $data = $request->all();
+        $request->validate([
+            'name'          => 'string|max:255',
+            'email'         => 'email|max:255|unique:users,email,' . $id,
+            'department_id' => 'exists:departments,id',
+            'role_id'       => 'sometimes|integer|exists:roles,id',
+            'is_active'     => 'boolean',
+            'password'      => 'sometimes|string|min:8',
+        ]);
 
-        // Hash password kalau dikirim
+        $data = $request->only('name', 'email', 'department_id', 'role_id', 'is_active');
         if ($request->has('password')) {
             $data['password'] = Hash::make($request->password);
         }
 
         $user->update($data);
-
+        $user->load('department', 'role');
         return response()->json([
             'success' => true,
-            'message' => 'Data user berhasil diperbarui',
+            'message' => 'User berhasil diperbarui',
             'data'    => $user,
         ]);
     }
 
+    // =========================================================================
+    // USER STATUS — dipanggil langsung dari route eksplisit
+    // =========================================================================
 
+    public function deactivate(Request $request, $id)
+    {
+        if ($request->user()->role_id > 1) {
+            return response()->json(['message' => 'Hanya Admin'], 403);
+        }
+        $user = User::find($id);
+        if (!$user) {
+            return response()->json(['message' => 'User tidak ditemukan'], 404);
+        }
+        if ($user->id === $request->user()->id) {
+            return response()->json(['message' => 'Tidak bisa menonaktifkan akun sendiri'], 403);
+        }
+        $user->update(['is_active' => false]);
+        return response()->json(['success' => true, 'message' => 'User berhasil dinonaktifkan', 'data' => $user]);
+    }
+
+    public function restore(Request $request, $id)
+    {
+        if ($request->user()->role_id > 1) {
+            return response()->json(['message' => 'Hanya Admin'], 403);
+        }
+        $user = User::find($id);
+        if (!$user) {
+            return response()->json(['message' => 'User tidak ditemukan'], 404);
+        }
+        $user->update(['is_active' => true]);
+        return response()->json(['success' => true, 'message' => 'User berhasil diaktifkan kembali', 'data' => $user]);
+    }
     private function projectUpdate(Request $request, $id)
     {
         $user    = $request->user();

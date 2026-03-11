@@ -48,7 +48,8 @@ class ListController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Daftar departemen berhasil diambil',
-            'data'    => Department::all(),
+            'data' => Department::withCount(['users' => fn ($q) => $q->where('is_active', true)])->get()
+
         ]);
     }
 
@@ -58,12 +59,24 @@ class ListController extends Controller
 
     private function userIndex(Request $request)
     {
-        $user  = $request->user();
-        $users = $user->role->name === 'employee'
-            ? User::where('id', $user->id)->get()
-            : User::all();
+        $user         = $request->user();
+        $withInactive = $request->boolean('with_inactive', false);
 
-        return response()->json($users);
+        // Non-admin hanya bisa lihat diri sendiri
+        if ($user->role->name === 'employee') {
+            return response()->json(
+                User::with(['department', 'role'])->where('id', $user->id)->get()
+            );
+        }
+
+        // Admin: default hanya tampilkan aktif, kecuali minta with_inactive
+        $query = User::with(['department', 'role']);
+        if (!$withInactive) {
+            $query->where('is_active', true);
+        }
+        // with_inactive=1 → tampilkan semua (aktif + nonaktif)
+
+        return response()->json($query->get());
     }
 
     // =========================================================================

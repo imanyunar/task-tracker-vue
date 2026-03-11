@@ -278,6 +278,9 @@ class CreateController extends Controller
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['success' => false, 'message' => 'Email atau password salah'], 401);
         }
+        if (!$user->is_active) {
+            return response()->json(['success' => false, 'message' => 'Akun Anda dinonaktifkan. Hubungi administrator.'], 403);
+        }
 
         $plainToken = Str::random(60);
         $user->update(['api_token' => hash('sha256', $plainToken)]);

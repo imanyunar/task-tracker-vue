@@ -22,6 +22,7 @@ class User extends Authenticatable
         'role_id',
         'api_token',
         'avatar',
+        'is_active',
     ];
 
     /**
@@ -33,10 +34,10 @@ class User extends Authenticatable
         'api_token',
     ];
 
-    /**
-     * Relasi ke Department (Many-to-One)
-     * Setiap user berada di bawah satu departemen.
-     */
+     protected $casts = [
+        
+        'is_active' => 'boolean',
+    ];
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
@@ -56,7 +57,10 @@ class User extends Authenticatable
      * User berperan sebagai pelaksana (assigned_to).
      */
     
-
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
     /**
      * Relasi ke Projects (Many-to-Many)
      * Menghubungkan user ke banyak proyek melalui tabel pivot project_user.

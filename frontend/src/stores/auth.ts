@@ -5,6 +5,7 @@ import type { User } from '@/services'
 interface AuthState {
   user: User | null
   token: string | null
+  _fetchingProfile: Promise<any> | null  // mencegah double fetch
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -17,8 +18,9 @@ export const useAuthStore = defineStore('auth', {
       console.error('Gagal membaca data user dari sessionStorage', e)
     }
     return {
-      user:  storedUser,
-      token: sessionStorage.getItem('api_token') || null,
+      user:              storedUser,
+      token:             sessionStorage.getItem('api_token') || null,
+      _fetchingProfile:  null,
     }
   },
 
@@ -69,19 +71,28 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async fetchProfile() {
-      try {
-        const res      = await apiClient.get('/profile')
-        const data     = res.data as any
-        const userData = data.data || data.user || data
+      // Kalau sudah ada request yang sedang berjalan, tunggu yang itu saja
+      // Ini mencegah App.vue dan router memanggil fetchProfile bersamaan
+      if (this._fetchingProfile) return this._fetchingProfile
 
-        this.user = userData as User
-        sessionStorage.setItem('user_data', JSON.stringify(this.user))
-        return userData
-      } catch (error: any) {
-        console.error('Token tidak valid atau server offline:', error)
-        this.logout()
-        throw error
-      }
+      this._fetchingProfile = apiClient.get('/profile')
+        .then((res) => {
+          const data     = res.data as any
+          const userData = data.data || data.user || data
+          this.user      = userData as User
+          sessionStorage.setItem('user_data', JSON.stringify(this.user))
+          return userData
+        })
+        .catch((error: any) => {
+          console.error('Token tidak valid atau server offline:', error)
+          this.logout()
+          throw error
+        })
+        .finally(() => {
+          this._fetchingProfile = null
+        })
+
+      return this._fetchingProfile
     },
 
     async refreshUserData() {

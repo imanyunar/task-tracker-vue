@@ -4,13 +4,13 @@ import { useAuthStore } from '../stores/auth'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/login', // Biasanya landing awal ke login jika belum ada session
+    redirect: '/login',
   },
   {
     path: '/login',
     name: 'Login',
     component: () => import('../views/login.vue'),
-    meta: { requiresGuest: true }, // Gunakan meta khusus tamu
+    meta: { requiresGuest: true },
   },
   {
     path: '/register',
@@ -30,41 +30,47 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/tasks.vue'),
     meta: { requiresAuth: true },
   },
-
   {
-      path: '/tasks/:id',
-      name: 'TaskDetail',
-      component: () => import('../views/TaskDetail.vue'),
-      meta: { requiresAuth: true },
+    path: '/tasks/:id',
+    name: 'TaskDetail',
+    component: () => import('../views/TaskDetail.vue'),
+    meta: { requiresAuth: true },
   },
-
   {
     path: '/projects',
     name: 'Projects',
     component: () => import('../views/projects.vue'),
     meta: { requiresAuth: true },
   },
-
   {
     path: '/projects/:id/chat',
     name: 'ProjectChat',
     component: () => import('../views/ProjectChat.vue'),
     meta: { requiresAuth: true },
-
   },
-
   {
     path: '/projects/:id',
     name: 'ProjectDetail',
     component: () => import('../views/ProjectDetail.vue'),
     meta: { requiresAuth: true },
   },
-
   {
     path: '/profile',
     name: 'Profile',
     component: () => import('../views/profile.vue'),
     meta: { requiresAuth: true },
+  },
+  {
+    path: '/departments',
+    name: 'Departments',
+    component: () => import('../views/department.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/users',
+    name: 'Users',
+    component: () => import('../views/employee.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/:pathMatch(.*)*',
@@ -79,26 +85,46 @@ const router = createRouter({
 })
 
 router.beforeEach(
-  (
+  async (
     to: RouteLocationNormalized,
     from: RouteLocationNormalized,
     next: NavigationGuardNext
   ) => {
     const authStore = useAuthStore()
-    
-    // AMBIL TOKEN LANGSUNG DARI STORAGE UNTUK KEAMANAN EKSTRA
-    // Ini memastikan router tidak hanya mengandalkan state Pinia yang mungkin telat update
     const token = localStorage.getItem('api_token') || authStore.token
 
-    if (to.meta.requiresAuth && !token) {
-      // Jika butuh auth tapi tidak ada token, paksa ke login
-      next({ name: 'Login' })
-    } else if (to.meta.requiresGuest && token) {
-      // Jika sudah login tapi coba buka Login/Register, lempar ke dashboard
-      next({ name: 'Dashboard' })
-    } else {
-      next()
+    // Tidak ada token yang valid
+    if (!token || token === 'undefined' || token === 'null' || token.length === 0) {
+      if (to.meta.requiresAuth) return next({ name: 'Login' })
+      return next()
     }
+
+    // Ada token tapi user belum di-load (misal: fresh page load / F5)
+    // Harus fetch dulu supaya requiresAdmin tidak salah evaluasi karena user masih null
+    if (!authStore.user) {
+      try {
+        await authStore.fetchProfile()
+      } catch {
+        // Token tidak valid → bersihkan sesi dan arahkan ke login
+        localStorage.removeItem('api_token')
+        localStorage.removeItem('user_data')
+        authStore.user = null
+        authStore.token = null
+        return next({ name: 'Login' })
+      }
+    }
+
+    // User sudah login, jangan biarkan masuk ke halaman guest (login/register)
+    if (to.meta.requiresGuest) {
+      return next({ name: 'Dashboard' })
+    }
+
+    // Halaman khusus admin — cek role setelah user pasti sudah ter-load
+    if (to.meta.requiresAdmin && authStore.user?.role_id !== 1) {
+      return next({ name: 'Dashboard' })
+    }
+
+    return next()
   }
 )
 

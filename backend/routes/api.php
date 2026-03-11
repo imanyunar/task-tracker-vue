@@ -22,6 +22,7 @@ Route::middleware('auth.manual')->group(function () {
     Route::post(  '/{model}',               [CreateController::class, 'store']);    // POST /projects, /tasks, /users
     Route::get(   '/{model}/{id}',          [ShowController::class,   'show']);     // GET /projects/{id}, /tasks/{id}
     Route::put(   '/{model}/{id}',          [UpdateController::class, 'update']);   // PUT /projects/{id}, /tasks/{id}
+    Route::patch( '/{model}/{id}/{action}',  [UpdateController::class, 'action']);   // PATCH /users/{id}/deactivate, /restore
     Route::post(  '/{model}/{action}',      [UpdateController::class, 'action']);   // POST /profile/avatar, /profile/password
     Route::delete('/{model}/{id}',          [DeleteController::class, 'destroy']);  // DELETE /projects/{id}, /tasks/{id}
 });
