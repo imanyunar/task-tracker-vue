@@ -19,7 +19,7 @@ apiClient.interceptors.request.use(
   (config) => {
     const token = sessionStorage.getItem('api_token')
 
-    if (token) {
+    if (token && !['/register', '/login'].includes(config.url || '')) {
       // Menggunakan format Bearer Token secara manual
       config.headers.Authorization = `Bearer ${token}`
     }

@@ -48,8 +48,9 @@
           <!-- Divider -->
           <div class="hidden sm:block h-5 w-px bg-slate-700 mx-1"></div>
 
-          <!-- Departments -->
+          <!-- Departments - Admin Only -->
           <router-link
+            v-if="isAdmin"
             to="/departments"
             class="px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-all whitespace-nowrap"
             active-class="bg-indigo-500/10 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/20"
@@ -57,8 +58,9 @@
             Departments
           </router-link>
 
-          <!-- Employees -->
+          <!-- Employees - Admin Only -->
           <router-link
+            v-if="isAdmin"
             to="/users"
             class="px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-all whitespace-nowrap"
             active-class="bg-indigo-500/10 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/20"
@@ -92,11 +94,14 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 
 const authStore = useAuthStore()
 const router = useRouter()
+
+const isAdmin = computed(() => authStore.user?.role_id === 1)
 
 const handleLogout = async () => {
   try {
@@ -109,7 +114,7 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
-/* Menghilangkan scrollbar saat menu digeser di mobile */
+/* No scrollbar on mobile menu scroll */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

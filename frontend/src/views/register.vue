@@ -2,12 +2,11 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { useList }  from '@/composables/useList'
 import { useToast } from '@/composables/useToast'
 
 const authStore = useAuthStore()
-const router    = useRouter()
-const toast     = useToast()
+const router = useRouter()
+const toast = useToast()
 
 const form = ref({
   name: '', email: '', password: '', password_confirmation: '', department: '',
@@ -15,8 +14,13 @@ const form = ref({
 
 const isSubmitting = ref(false)
 
-// departments fetched via useList — loading state included
-const { items: departments, loading: loadingDepts } = useList('departments')
+const departments = ref([
+  { id: 1, name: 'IT Support' },
+  { id: 2, name: 'Human Resource' },
+  { id: 3, name: 'Marketing' },
+  { id: 5, name: 'Finance' },
+  { id: 6, name: 'Research and Development' }
+])
 
 const handleSubmit = async () => {
   const { name, email, password, password_confirmation, department } = form.value
@@ -89,11 +93,10 @@ const handleSubmit = async () => {
             <div class="relative">
               <select
                 v-model="form.department"
-                :disabled="loadingDepts"
-                class="w-full appearance-none px-5 py-4 bg-slate-950/50 border border-slate-700 rounded-2xl text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all disabled:opacity-50"
+                class="w-full appearance-none px-5 py-4 bg-slate-950/50 border border-slate-700 rounded-2xl text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
               >
                 <option value="" disabled>
-                  {{ loadingDepts ? 'Memuat...' : 'Pilih Departemen' }}
+                  Pilih Departemen
                 </option>
                 <option v-for="dept in departments" :key="dept.id" :value="dept.id">
                   {{ dept.name }}
@@ -178,7 +181,7 @@ const handleSubmit = async () => {
 }
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(40px); }
-  to   { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 select::-webkit-scrollbar { width: 6px; }
