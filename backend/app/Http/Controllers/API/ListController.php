@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attachment;
 use App\Models\Department;
 use App\Models\Project;
 use App\Models\ProjectChat;
@@ -24,6 +25,7 @@ class ListController extends Controller
             'users'       => $this->userIndex($request),
             'projects'    => $this->projectIndex($request),
             'tasks'       => $this->taskIndex($request),
+            'attachments' => $this->attachmentIndex($request),
             'profile'     => $this->profileIndex($request),
             default       => response()->json(['message' => 'Model tidak ditemukan'], 404),
         };
@@ -35,8 +37,44 @@ class ListController extends Controller
         return match (true) {
             $model === 'projects' && $action === 'tasks' => $this->tasksByProject($request, $id),
             $model === 'projects' && $action === 'chats' => $this->chatIndex($request, $id),
+            $model === 'tasks' && $action === 'attachments' => $this->attachmentsByTask($request, $id),
             default => response()->json(['message' => "Action [$action] tidak ditemukan untuk [$model]"], 404),
         };
+    }
+
+    // =========================================================================
+    // ATTACHMENT
+    // =========================================================================
+
+    private function attachmentIndex(Request $request)
+    {
+        $taskId = $request->query('task_id');
+        
+        $query = Attachment::with('user:id,name');
+        
+        if ($taskId) {
+            $query->where('task_id', $taskId);
+        }
+        
+        $attachments = $query->latest()->get();
+        
+        return response()->json([
+            'success' => true,
+            'data' => $attachments,
+        ]);
+    }
+
+    private function attachmentsByTask(Request $request, $taskId)
+    {
+        $attachments = Attachment::with('user:id,name')
+            ->where('task_id', $taskId)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $attachments,
+        ]);
     }
 
     // =========================================================================

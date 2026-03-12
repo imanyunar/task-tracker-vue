@@ -147,23 +147,103 @@
 </template>
 
 <script setup lang="ts">
-import { useDepartments } from '@/composables/useDepartments'
+import { computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
+import { useList } from '@/composables/useList'
+import { useDelete } from '@/composables/useDelete'
+import apiClient from '@/services/api'
 
-const {
-  departments,
-  loading,
-  totalEmployees,
-  isAdmin,
+const authStore = useAuthStore()
+const toast = useToast()
+const { confirm } = useConfirm()
 
-  showModal,
-  isEditing,
-  submitting,
-  formData,
+const isAdmin = computed(() => authStore.user?.role_id === 1)
 
-  openCreateModal,
-  openEditModal,
-  closeModal,
-  submitDepartment,
-  deleteDepartment,
-} = useDepartments()
+// List departments
+const { items: departments, loading, fetch: fetchDepartments } = useList('departments')
+
+// Delete department
+const { remove: deleteDept } = useDelete('departments')
+
+const totalEmployees = computed(() => {
+  return departments.value.reduce((sum, dept) => {
+    return sum + (dept.users_count ?? dept.users?.length ?? 0)
+  }, 0)
+})
+
+// Form state
+const showModal = ref(false)
+const isEditing = ref(false)
+const editingId = ref<number | null>(null)
+const submitting = ref(false)
+const formData = ref({
+  name: '',
+  description: ''
+})
+
+const openCreateModal = () => {
+  isEditing.value = false
+  editingId.value = null
+  formData.value = { name: '', description: '' }
+  showModal.value = true
+}
+
+const openEditModal = (dept: any) => {
+  isEditing.value = true
+  editingId.value = dept.id
+  formData.value = { name: dept.name, description: dept.description || '' }
+  showModal.value = true
+}
+
+const closeModal = () => {
+  showModal.value = false
+  isEditing.value = false
+  editingId.value = null
+}
+
+const submitDepartment = async () => {
+  submitting.value = true
+  try {
+    if (isEditing.value && editingId.value) {
+      await apiClient.put(`/departments/${editingId.value}`, formData.value)
+      toast.success('Departemen berhasil diperbarui!')
+    } else {
+      await apiClient.post('/departments', formData.value)
+      toast.success('Departemen berhasil dibuat!')
+    }
+    closeModal()
+    await fetchDepartments()
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Gagal menyimpan departemen')
+  } finally {
+    submitting.value = false
+  }
+}
+
+const deleteDepartment = async (id: number) => {
+  const ok = await confirm({
+    title: 'Hapus Departemen',
+    message: 'Hapus departemen ini secara permanen? Semua karyawan di departemen ini akan kehilangan departemen.',
+    type: 'danger',
+    confirmText: 'Hapus'
+  })
+  if (!ok) return
+
+  const success = await deleteDept(id, { skipConfirm: true })
+  if (success) {
+    await fetchDepartments()
+  }
+}
+
+// Fetch on mount
+import { onMounted } from 'vue'
+onMounted(() => {
+  fetchDepartments()
+})
+
+// Import ref
+import { ref } from 'vue'
 </script>
+

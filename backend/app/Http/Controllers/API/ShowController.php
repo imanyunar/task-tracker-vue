@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attachment;
 use App\Models\Department;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ShowController extends Controller
 {
@@ -23,8 +25,51 @@ class ShowController extends Controller
             'users'       => $this->userShow($id),
             'projects'    => $this->projectShow($id),
             'tasks'       => $this->taskShow($id),
+            'attachments' => $this->attachmentShow($id),
             default       => response()->json(['message' => 'Model tidak ditemukan'], 404),
         };
+    }
+
+    // =========================================================================
+    // ATTACHMENT
+    // =========================================================================
+
+    private function attachmentShow($id)
+    {
+        $attachment = Attachment::with('user:id,name')->find($id);
+
+        if (!$attachment) {
+            return response()->json(['message' => 'File tidak ditemukan'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $attachment,
+        ]);
+    }
+
+    /**
+     * GET /{model}/{id}/download
+     */
+    public function download(Request $request, string $model, $id)
+    {
+        if ($model !== 'attachments') {
+            return response()->json(['message' => 'Model tidak ditemukan'], 404);
+        }
+
+        $attachment = Attachment::find($id);
+
+        if (!$attachment) {
+            return response()->json(['message' => 'File tidak ditemukan'], 404);
+        }
+
+        $path = storage_path('app/public/' . $attachment->file_path);
+
+        if (!file_exists($path)) {
+            return response()->json(['message' => 'File tidak ditemukan di storage'], 404);
+        }
+
+        return response()->download($path, $attachment->file_name);
     }
 
     // =========================================================================
@@ -98,7 +143,7 @@ class ShowController extends Controller
 
     private function taskShow($id)
     {
-        $task = Task::with(['project.members', 'user.department'])->findOrFail($id);
+        $task = Task::with(['project.members', 'user.department', 'attachments'])->findOrFail($id);
 
         return response()->json(['success' => true, 'data' => $task]);
     }

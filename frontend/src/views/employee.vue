@@ -136,7 +136,7 @@
                   </span>
                 </td>
 
-                <!-- Aksi -->
+                <!-- aksi -->
                 <td v-if="isAdmin" class="px-6 py-4">
                   <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button v-if="emp.is_active" @click="openEditModal(emp)" class="p-2 text-slate-600 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-all" title="Edit">
@@ -266,42 +266,197 @@
 </template>
 
 <script setup lang="ts">
-// FIX: import dari useEmployees (plural) sesuai nama file yang benar
-import { useEmployees } from "@/composables/useEmployees"
+import { ref, computed, onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
+import { useList } from '@/composables/useList'
+import { useDelete } from '@/composables/useDelete'
+import apiClient from '@/services/api'
 
-const {
-  currentUser,
-  isAdmin,
+const authStore = useAuthStore()
+const toast = useToast()
+const { confirm } = useConfirm()
 
-  employees,
-  filteredEmployees,
-  loading,
+const currentUser = computed(() => authStore.user)
+const isAdmin = computed(() => authStore.user?.role_id === 1)
 
-  searchQuery,
-  filterStatus,
-  filterTabs,
+// Role config
+const roleConfig: Record<number, { label: string; class: string }> = {
+  1: { label: 'Admin', class: 'text-rose-400 border-rose-500/30 bg-rose-500/10' },
+  2: { label: 'Manager', class: 'text-blue-400 border-blue-500/30 bg-blue-500/10' },
+  3: { label: 'Employee', class: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' },
+}
 
-  activeCount,
-  inactiveCount,
+// List employees with inactive included
+const { items: employees, loading, fetch: fetchEmployees } = useList('users', { 
+  immediate: false,
+  params: { with_inactive: true }
+})
 
-  roleConfig,
+// List departments
+const { items: departments, fetch: fetchDepartments } = useList('departments')
 
-  deactivateEmployee,
-  restoreEmployee,
-  deleteEmployee,
+// Delete employee
+const { remove: deleteUser } = useDelete('users')
 
-  togglingId,
+// Filter state
+const searchQuery = ref('')
+const filterStatus = ref('all')
+const filterTabs = [
+  { label: 'Semua', value: 'all' },
+  { label: 'Aktif', value: 'active' },
+  { label: 'Nonaktif', value: 'inactive' },
+]
+const togglingId = ref<number | null>(null)
 
-  showModal,
-  isEditing,
-  submitting,
-  formData,
+const filteredEmployees = computed(() => {
+  let result = employees.value
 
-  openCreateModal,
-  openEditModal,
-  closeModal,
-  submitEmployee,
+  // Filter by status
+  if (filterStatus.value === 'active') {
+    result = result.filter((e: any) => e.is_active)
+  } else if (filterStatus.value === 'inactive') {
+    result = result.filter((e: any) => !e.is_active)
+  }
 
-  departments,
-} = useEmployees()
+  // Filter by search
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    result = result.filter((e: any) => 
+      e.name?.toLowerCase().includes(q) || 
+      e.email?.toLowerCase().includes(q)
+    )
+  }
+
+  return result
+})
+
+const activeCount = computed(() => employees.value.filter((e: any) => e.is_active).length)
+const inactiveCount = computed(() => employees.value.filter((e: any) => !e.is_active).length)
+
+// Form state
+const showModal = ref(false)
+const isEditing = ref(false)
+const editingId = ref<number | null>(null)
+const submitting = ref(false)
+const formData = ref({
+  name: '',
+  email: '',
+  department_id: '',
+  role_id: 3,
+  password: ''
+})
+
+const openCreateModal = () => {
+  isEditing.value = false
+  editingId.value = null
+  formData.value = { name: '', email: '', department_id: '', role_id: 3, password: '' }
+  showModal.value = true
+}
+
+const openEditModal = (emp: any) => {
+  isEditing.value = true
+  editingId.value = emp.id
+  formData.value = { 
+    name: emp.name, 
+    email: emp.email, 
+    department_id: emp.department_id, 
+    role_id: emp.role_id, 
+    password: '' 
+  }
+  showModal.value = true
+}
+
+const closeModal = () => {
+  showModal.value = false
+  isEditing.value = false
+  editingId.value = null
+}
+
+const submitEmployee = async () => {
+  submitting.value = true
+  try {
+    const payload = { ...formData.value }
+    if (isEditing.value && editingId.value) {
+      // Remove empty password on edit
+      if (!payload.password) delete payload.password
+      await apiClient.put(`/users/${editingId.value}`, payload)
+      toast.success('Karyawan berhasil diperbarui!')
+    } else {
+      await apiClient.post('/users', payload)
+      toast.success('Karyawan berhasil ditambahkan!')
+    }
+    closeModal()
+    await fetchEmployees()
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Gagal menyimpan karyawan')
+  } finally {
+    submitting.value = false
+  }
+}
+
+const deactivateEmployee = async (emp: any) => {
+  const ok = await confirm({
+    title: 'Nonaktifkan Karyawan',
+    message: `Nonaktifkan ${emp.name}?`,
+    type: 'warning',
+    confirmText: 'Nonaktifkan'
+  })
+  if (!ok) return
+
+  togglingId.value = emp.id
+  try {
+    await apiClient.patch(`/users/${emp.id}/deactivate`)
+    toast.success('Karyawan dinonaktifkan')
+    await fetchEmployees()
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Gagal')
+  } finally {
+    togglingId.value = null
+  }
+}
+
+const restoreEmployee = async (emp: any) => {
+  const ok = await confirm({
+    title: 'Aktifkan Karyawan',
+    message: `Aktifkan kembali ${emp.name}?`,
+    type: 'info',
+    confirmText: 'Aktifkan'
+  })
+  if (!ok) return
+
+  togglingId.value = emp.id
+  try {
+    await apiClient.patch(`/users/${emp.id}/restore`)
+    toast.success('Karyawan diaktifkan kembali')
+    await fetchEmployees()
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Gagal')
+  } finally {
+    togglingId.value = null
+  }
+}
+
+const deleteEmployee = async (id: number) => {
+  const ok = await confirm({
+    title: 'Hapus Permanen',
+    message: 'Hapus karyawan ini secara permanen?',
+    type: 'danger',
+    confirmText: 'Hapus'
+  })
+  if (!ok) return
+
+  const success = await deleteUser(id, { skipConfirm: true })
+  if (success) {
+    await fetchEmployees()
+  }
+}
+
+// Fetch on mount
+onMounted(() => {
+  fetchEmployees()
+  fetchDepartments()
+})
 </script>
+

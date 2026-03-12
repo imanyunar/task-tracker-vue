@@ -14,6 +14,7 @@ import { useConfirm } from '@/composables/useConfirm'
 //
 // Skip confirm:   await remove(id, { skipConfirm: true })
 // Nested:         useDelete(`projects/${projectId}/members`)
+// File delete:    await remove(fileId, { skipConfirm: true })
 
 export function useDelete(
   endpoint: string,
@@ -63,5 +64,46 @@ export function useDelete(
     }
   }
 
-  return { remove, deleting, error }
+  // ========== BATCH DELETE FUNCTIONALITY ==========
+  // Delete multiple items at once
+  // Usage: const { removeBatch } = useDelete('attachments')
+  // await removeBatch([1, 2, 3])
+  
+  const removeBatch = async (
+    ids: (number | string)[],
+    overrides: { skipConfirm?: boolean; confirmMessage?: string } = {}
+  ) => {
+    if (!overrides.skipConfirm) {
+      const ok = await confirm({
+        title:       'Konfirmasi Hapus Massal',
+        message:     overrides.confirmMessage ?? `Hapus ${ids.length} item secara permanen?`,
+        type:        options.confirmType    ?? 'danger',
+        confirmText: options.confirmText    ?? 'Hapus Semua',
+      })
+      if (!ok) return false
+    }
+
+    deleting.value = true
+    error.value    = null
+    const results: boolean[] = []
+
+    try {
+      for (const id of ids) {
+        await apiClient.delete(`/${endpoint}/${id}`)
+        results.push(true)
+      }
+      toast.success(`${ids.length} item berhasil dihapus.`)
+      options.onSuccess?.(ids as any)
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? 'Gagal menghapus beberapa item.'
+      error.value = msg
+      toast.error(msg)
+      return false
+    } finally {
+      deleting.value = false
+    }
+  }
+
+  return { remove, removeBatch, deleting, error }
 }

@@ -40,5 +40,81 @@ export function useList<T = any>(
 
   if (options.immediate !== false) fetch()
 
-  return { items, loading, error, isEmpty, fetch }
+  // ========== PAGINATION FUNCTIONALITY ==========
+  // Extended for pagination support
+  // Usage: const { items, loading, fetch, pagination } = useList('attachments')
+  // pagination: { page, perPage, total, lastPage }
+  
+  const pagination = ref({
+    page: 1,
+    perPage: 15,
+    total: 0,
+    lastPage: 1,
+  })
+
+  const fetchPaginated = async (params?: Record<string, any>) => {
+    loading.value = true
+    error.value   = null
+    try {
+      const res = await apiClient.get(`/${endpoint}`, {
+        params: { 
+          page: pagination.value.page,
+          per_page: pagination.value.perPage,
+          ...options.params, 
+          ...params 
+        },
+      })
+      
+      const raw = res.data?.data ?? res.data
+      
+      // Handle pagination response
+      if (res.data?.meta) {
+        items.value = res.data.data || []
+        pagination.value = {
+          page: res.data.meta.current_page || 1,
+          perPage: res.data.meta.per_page || 15,
+          total: res.data.meta.total || 0,
+          lastPage: res.data.meta.last_page || 1,
+        }
+      } else {
+        const list = Array.isArray(raw) ? raw : []
+        items.value = options.transform ? options.transform(list) : (list as T[])
+      }
+    } catch (err: any) {
+      error.value = err?.response?.data?.message ?? 'Gagal memuat data.'
+      toast.error(error.value!)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const setPage = (page: number) => {
+    pagination.value.page = page
+    fetchPaginated()
+  }
+
+  const nextPage = () => {
+    if (pagination.value.page < pagination.value.lastPage) {
+      setPage(pagination.value.page + 1)
+    }
+  }
+
+  const prevPage = () => {
+    if (pagination.value.page > 1) {
+      setPage(pagination.value.page - 1)
+    }
+  }
+
+  return { 
+    items, 
+    loading, 
+    error, 
+    isEmpty, 
+    fetch, 
+    fetchPaginated,
+    pagination,
+    setPage,
+    nextPage,
+    prevPage,
+  }
 }

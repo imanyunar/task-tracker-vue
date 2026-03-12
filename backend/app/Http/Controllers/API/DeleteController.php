@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attachment;
 use App\Models\Department;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class DeleteController extends Controller
 {
@@ -23,8 +25,31 @@ class DeleteController extends Controller
             'users'       => $this->userDestroy($request, $id),
             'projects'    => $this->projectDestroy($request, $id),
             'tasks'       => $this->taskDestroy($request, $id),
+            'attachments' => $this->attachmentDestroy($request, $id),
             default       => response()->json(['message' => 'Model tidak ditemukan'], 404),
         };
+    }
+
+    // =========================================================================
+    // ATTACHMENT
+    // =========================================================================
+
+    private function attachmentDestroy(Request $request, $id)
+    {
+        $attachment = Attachment::find($id);
+
+        if (!$attachment) {
+            return response()->json(['message' => 'File tidak ditemukan'], 404);
+        }
+
+        // Delete file from storage
+        if ($attachment->file_path && Storage::disk('public')->exists($attachment->file_path)) {
+            Storage::disk('public')->delete($attachment->file_path);
+        }
+
+        $attachment->delete();
+
+        return response()->json(['success' => true, 'message' => 'File berhasil dihapus']);
     }
 
     // =========================================================================

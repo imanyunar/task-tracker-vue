@@ -1,175 +1,206 @@
-import { ref, computed, reactive, onMounted } from 'vue'
-import { useAuthStore } from '../stores/auth'
-import { taskService, projectService } from '../services'
+<template>
+  <div class="min-h-screen bg-slate-900 text-white p-6">
+    <div class="max-w-7xl mx-auto">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold">Detail Tugas</h1>
+        <router-link to="/tasks" class="text-indigo-400 hover:text-indigo-300">
+          ← Kembali ke Tasks
+        </router-link>
+      </div>
+
+      <!-- Loading -->
+      <div v-if="loading" class="flex justify-center py-12">
+        <div class="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
+      </div>
+
+      <!-- Task Detail Content -->
+      <div v-else-if="task" class="space-y-6">
+        <!-- Title & Status -->
+        <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
+          <div class="flex items-start justify-between">
+            <div>
+              <h2 class="text-xl font-bold mb-2">{{ task.title }}</h2>
+              <p class="text-slate-400">{{ task.description || 'Tidak ada deskripsi' }}</p>
+            </div>
+            <span :class="['px-3 py-1 rounded-full text-sm font-medium', statusBadgeClass(task.status)]">
+              {{ getStatusLabel(task.status) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Task Info -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <p class="text-slate-400 text-sm">Priority</p>
+            <span :class="['inline-block mt-1 px-2 py-1 rounded text-sm', priorityBadgeClass(task.priority)]">
+              {{ task.priority?.toUpperCase() }}
+            </span>
+          </div>
+          <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <p class="text-slate-400 text-sm">Due Date</p>
+            <p class="text-white font-medium mt-1">{{ task.due_date ? new Date(task.due_date).toLocaleDateString('id-ID') : '-' }}</p>
+          </div>
+          <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <p class="text-slate-400 text-sm">Project</p>
+            <p class="text-white font-medium mt-1">{{ task.project?.name || '-' }}</p>
+          </div>
+          <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <p class="text-slate-400 text-sm">Assigned To</p>
+            <p class="text-white font-medium mt-1">{{ task.user?.name || '-' }}</p>
+          </div>
+        </div>
+
+        <!-- Attachments Section -->
+        <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold">Lampiran</h3>
+            <label class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg cursor-pointer transition-colors">
+              <input type="file" class="hidden" @change="handleFileUpload" :disabled="uploading">
+              <span v-if="uploading">Mengupload... {{ progress }}%</span>
+              <span v-else>+ Tambah File</span>
+            </label>
+          </div>
+
+          <!-- Upload Progress -->
+          <div v-if="uploading" class="mb-4">
+            <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+              <div class="h-full bg-indigo-500 transition-all" :style="{ width: progress + '%' }"></div>
+            </div>
+          </div>
+
+          <!-- File List -->
+          <div v-if="attachments.length > 0" class="space-y-2">
+            <div v-for="file in attachments" :key="file.id" class="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+              <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+                <span class="text-sm">{{ file.file_name }}</span>
+                <span class="text-xs text-slate-500">({{ formatFileSize(file.file_size) }})</span>
+              </div>
+              <div class="flex gap-2">
+                <button @click="downloadFile(file.id, file.file_name)" class="text-indigo-400 hover:text-indigo-300 text-sm">
+                  Download
+                </button>
+                <button @click="deleteFile(file.id)" class="text-rose-400 hover:text-rose-300 text-sm">
+                  Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+          <p v-else class="text-slate-500 text-sm">Belum ada lampiran.</p>
+        </div>
+      </div>
+
+      <!-- Not Found -->
+      <div v-else class="text-center py-12">
+        <p class="text-slate-400">Tugas tidak ditemukan.</p>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useCreate } from '@/composables/useCreate'
+import { useShow } from '@/composables/useShow'
+import { useDelete } from '@/composables/useDelete'
+import { useList } from '@/composables/useList'
+import apiClient from '@/services/api'
 
-export function useTasksDashboard() {
-  const authStore = useAuthStore()
-  const toast     = useToast()
-  const { confirm } = useConfirm()
+const route = useRoute()
+const toast = useToast()
+const { confirm } = useConfirm()
 
-  const tasks = ref<any[]>([])
-  const projects = ref<any[]>([])
-  const loading = ref(false)
-  const searchQuery = ref('')
-  const showModal = ref(false)
-  const editingTask = ref<any>(null)
-  const filterStatus = ref('')
+// Task data
+const task = ref<any>(null)
+const loading = ref(false)
 
-  const formData = reactive({
-    title: '', description: '', priority: 'medium', status: 'todo',
-    project_id: '' as string | number, user_id: '' as string | number, due_date: ''
-  })
+// File upload composables
+const { upload, uploading, progress } = useCreate('attachments')
+const { download } = useShow('attachments')
+const { remove: deleteAttachment } = useDelete('attachments')
+const { items: attachments, fetch: fetchAttachments } = useList('attachments', { immediate: false })
 
-  const user            = computed(() => authStore.user)
-  const isAdminGlobal   = computed(() => user.value?.role_id === 1)
-  const isManagerGlobal = computed(() => user.value?.role_id === 2)
-
-  const getRoleInProject = (project: any) => {
-    if (!project || !project.members) return 'none'
-    const member = project.members.find((m: any) => m.id === user.value?.id)
-    return member?.pivot?.role || 'none'
-  }
-
-  const canCreateAnyTask = computed(() => {
-    if (isAdminGlobal.value || isManagerGlobal.value) return true
-    return projects.value.some(p => {
-      const role = getRoleInProject(p)
-      return role === 'owner' || role === 'manager'
-    })
-  })
-
-  const canEditFullTask   = (task: any) => { if (isAdminGlobal.value) return true; const role = getRoleInProject(task.project); return role === 'owner' || role === 'manager' }
-  const canDeleteTask     = (task: any) => { if (isAdminGlobal.value) return true; const role = getRoleInProject(task.project); return role === 'owner' }
-  const canUpdateStatusOnly = (task: any) => { const role = getRoleInProject(task.project); return role !== 'none' && role !== 'stakeholder' }
-
-  const projectMembers = computed(() => {
-    if (!formData.project_id) return []
-    const selected = projects.value.find(p => p.id === formData.project_id)
-    return selected?.members || []
-  })
-
-  const taskCounts = computed(() => ({
-    todo:   tasks.value.filter(t => t.status === 'todo').length,
-    doing:  tasks.value.filter(t => t.status === 'doing').length,
-    review: tasks.value.filter(t => t.status === 'review').length,
-    done:   tasks.value.filter(t => t.status === 'done').length,
-  }))
-
-  const filteredTasks = computed(() => {
-    let result = tasks.value.filter(t =>
-      t.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      t.description?.toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
-    if (filterStatus.value) result = result.filter(t => t.status === filterStatus.value)
-    return result
-  })
-
-  const onProjectChange = () => { formData.user_id = '' }
-
-  const fetchAllData = async () => {
-    loading.value = true
-    try {
-      const [tasksRes, projectsRes] = await Promise.all([
-        taskService.getAllTasks(),
-        projectService.getAllProjects(),
-      ])
-      tasks.value    = tasksRes.data.data    || tasksRes.data    || []
-      projects.value = projectsRes.data.data || projectsRes.data || []
-    } catch (error) { console.error('Error loading tasks:', error) }
-    finally { loading.value = false }
-  }
-
-  const openModal = (task: any = null) => {
-    if (task) {
-      editingTask.value = task
-      let formattedDate = ''
-      if (task.due_date) {
-        const d = new Date(task.due_date)
-        formattedDate = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-      }
-      Object.assign(formData, { title: task.title, description: task.description, priority: task.priority, status: task.status, project_id: task.project_id, user_id: task.user_id, due_date: formattedDate })
-    } else {
-      editingTask.value = null
-      Object.assign(formData, { title: '', description: '', priority: 'medium', status: 'todo', project_id: '', user_id: '', due_date: '' })
+const loadTask = async () => {
+  loading.value = true
+  try {
+    const taskId = route.params.id
+    const res = await apiClient.get(`/tasks/${taskId}`)
+    task.value = res.data.data || res.data
+    if (task.value) {
+      await fetchAttachments({ task_id: task.value.id })
     }
-    showModal.value = true
-  }
-
-  const closeModal = () => { showModal.value = false; editingTask.value = null }
-
-  const saveTask = async () => {
-    try {
-      if (!formData.due_date) { toast.warning('Deadline wajib diisi.'); return }
-      const payload = { ...formData, project_id: Number(formData.project_id), user_id: Number(formData.user_id) }
-      if (editingTask.value) {
-        await taskService.updateTask(editingTask.value.id, payload)
-        toast.success('Tugas berhasil diperbarui!')
-      } else {
-        await taskService.createTask(payload)
-        toast.success('Tugas berhasil dibuat!')
-      }
-      closeModal()
-      await fetchAllData()
-    } catch (error: any) {
-      toast.error('Gagal: ' + (error.response?.data?.message || error.message))
-    }
-  }
-
-  const handleQuickUpdate = async (task: any, newStatus: string) => {
-    try {
-      await taskService.updateTask(task.id, { status: newStatus })
-      task.status = newStatus
-      toast.success('Status tugas diperbarui.')
-    } catch (error) {
-      toast.error('Gagal update status.')
-      await fetchAllData()
-    }
-  }
-
-  const deleteTask = async (id: number) => {
-    const ok = await confirm({
-      message: 'Hapus tugas ini secara permanen?',
-      type: 'danger', confirmText: 'Hapus Tugas',
-    })
-    if (!ok) return
-    try {
-      await taskService.deleteTask(id)
-      tasks.value = tasks.value.filter(t => t.id !== id)
-      toast.success('Tugas berhasil dihapus.')
-    } catch (error: any) {
-      toast.error('Gagal menghapus: ' + (error.response?.data?.message || 'Error'))
-    }
-  }
-
-  const getStatusLabel = (status: string) => {
-    const labels: any = { todo: 'To Do', doing: 'Doing', review: 'Review', done: 'Done' }
-    return labels[status] || status
-  }
-
-  const statusBadgeClass = (status: string) => {
-    const map: any = { done: 'badge-success', doing: 'badge-primary', review: 'badge-warning', todo: 'badge-danger' }
-    return map[status] || 'badge-danger'
-  }
-
-  const priorityBadgeClass = (priority: string) => {
-    const map: any = {
-      low:    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      medium: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-      high:   'bg-rose-500/10 text-rose-400 border-rose-500/20',
-      urgent: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-    }
-    return map[priority] || 'bg-slate-700/30 text-slate-400 border-slate-700'
-  }
-
-  onMounted(fetchAllData)
-
-  return {
-    tasks, projects, loading, searchQuery, showModal, editingTask, filterStatus, formData,
-    canCreateAnyTask, projectMembers, taskCounts, filteredTasks,
-    canEditFullTask, canDeleteTask, canUpdateStatusOnly, onProjectChange,
-    getStatusLabel, statusBadgeClass, priorityBadgeClass, openModal, closeModal,
-    saveTask, handleQuickUpdate, deleteTask
+  } catch (error) {
+    console.error('Error loading task:', error)
+    toast.error('Gagal memuat detail tugas')
+  } finally {
+    loading.value = false
   }
 }
+
+const handleFileUpload = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file || !task.value) return
+
+  await upload(file, { task_id: task.value.id })
+  await fetchAttachments({ task_id: task.value.id })
+  input.value = ''
+}
+
+const downloadFile = async (fileId: number, filename: string) => {
+  await download(fileId, filename)
+}
+
+const deleteFile = async (fileId: number) => {
+  const ok = await confirm({
+    message: 'Hapus file ini?',
+    type: 'danger',
+    confirmText: 'Hapus'
+  })
+  if (!ok) return
+  await deleteAttachment(fileId, { skipConfirm: true })
+  await fetchAttachments({ task_id: task.value.id })
+}
+
+const getStatusLabel = (status: string) => {
+  const labels: Record<string, string> = { todo: 'To Do', doing: 'Doing', review: 'Review', done: 'Done' }
+  return labels[status] || status
+}
+
+const statusBadgeClass = (status: string) => {
+  const map: Record<string, string> = {
+    done: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+    doing: 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30',
+    review: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+    todo: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+  }
+  return map[status] || map.todo
+}
+
+const priorityBadgeClass = (priority: string) => {
+  const map: Record<string, string> = {
+    low: 'bg-emerald-500/20 text-emerald-400',
+    medium: 'bg-amber-500/20 text-amber-400',
+    high: 'bg-rose-500/20 text-rose-400',
+    urgent: 'bg-purple-500/20 text-purple-400',
+  }
+  return map[priority] || map.medium
+}
+
+const formatFileSize = (bytes: number) => {
+  if (!bytes) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
+
+onMounted(loadTask)
+</script>
+

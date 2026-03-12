@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attachment;
 use App\Models\Department;
 use App\Models\Post;
 use App\Models\Project;
@@ -11,6 +12,7 @@ use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class CreateController extends Controller
@@ -27,6 +29,7 @@ class CreateController extends Controller
             'users'       => $this->userStore($request),
             'projects'    => $this->projectStore($request),
             'tasks'       => $this->taskStore($request),
+            'attachments' => $this->attachmentStore($request),
             default       => response()->json(['message' => 'Model tidak ditemukan'], 404),
         };
     }
@@ -39,8 +42,41 @@ class CreateController extends Controller
             $model === 'projects' && $action === 'posts'   => $this->projectStorePost($request, $id),
             $model === 'projects' && $action === 'chats'   => $this->chatStore($request, $id),
             $model === 'projects' && $action === 'tasks'   => $this->taskStore($request),
+            $model === 'tasks' && $action === 'attachments' => $this->attachmentStore($request),
             default => response()->json(['message' => "Action [$action] tidak ditemukan untuk [$model]"], 404),
         };
+    }
+
+    // =========================================================================
+    // ATTACHMENT (File Upload)
+    // =========================================================================
+
+    private function attachmentStore(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|max:10240', // Max 10MB
+            'task_id' => 'required|exists:tasks,id',
+        ]);
+
+        $file = $request->file('file');
+        
+        // Store file
+        $path = $file->store('attachments/' . date('Y/m'), 'public');
+        
+        $attachment = Attachment::create([
+            'task_id' => $request->task_id,
+            'user_id' => $request->user()->id,
+            'file_name' => $file->getClientOriginalName(),
+            'file_path' => $path,
+            'file_type' => $file->getMimeType(),
+            'file_size' => $file->getSize(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'File berhasil diupload',
+            'data' => $attachment,
+        ], 201);
     }
 
     // =========================================================================
