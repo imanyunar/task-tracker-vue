@@ -51,12 +51,8 @@ class ShowController extends Controller
     /**
      * GET /{model}/{id}/download
      */
-    public function download(Request $request, string $model, $id)
+public function download(Request $request, $id)
     {
-        if ($model !== 'attachments') {
-            return response()->json(['message' => 'Model tidak ditemukan'], 404);
-        }
-
         $attachment = Attachment::find($id);
 
         if (!$attachment) {
