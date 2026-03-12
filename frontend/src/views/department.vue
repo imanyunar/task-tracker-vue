@@ -147,17 +147,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useAuthStore } from '../stores/auth'
 import { useDepartments } from '@/composables/useDepartments'
-
-const authStore = useAuthStore()
-const isAdmin = computed(() => authStore.user?.role_id === 1)
 
 const {
   departments,
   loading,
   totalEmployees,
+  isAdmin,
 
   showModal,
   isEditing,

@@ -316,7 +316,7 @@
             <!-- Members tab -->
             <div v-if="activeTab === 'members'" class="animate-fade-in">
 
-              <!-- Undang anggota BARU (hanya tampil user yang belum jadi member) -->
+              <!-- Invite new member -->
               <div v-if="selectedProject?.my_role_id <= 2 || user?.role_id === 1" class="mb-6 p-5 bg-slate-900/60 border border-slate-800 rounded-2xl space-y-4">
                 <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Undang Anggota Baru</p>
                 <div class="flex flex-col sm:flex-row gap-3">
@@ -357,7 +357,6 @@
                   </div>
 
                   <div class="flex items-center gap-2 flex-shrink-0">
-                    <!-- Jika canManage dan bukan owner: dropdown edit role langsung -->
                     <template v-if="(selectedProject?.my_role_id <= 2 || user?.role_id === 1) && (member.pivot?.role_in_project ?? member.role_in_project) !== 1">
                       <select
                         :value="member.pivot?.role_in_project ?? member.role_in_project"
@@ -368,12 +367,11 @@
                         <option value="3" class="bg-slate-900 text-white normal-case">Contributor</option>
                         <option value="4" class="bg-slate-900 text-white normal-case">Stakeholder</option>
                       </select>
-                      <button @click="removeMember(member.id)"
+                      <button @click="removeMemberFromProject(member.id)"
                         class="opacity-0 group-hover/member:opacity-100 p-1.5 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </template>
-                    <!-- Owner atau non-manager: badge saja -->
                     <template v-else>
                       <span :class="['badge text-[9px]', roleConfig[member.pivot?.role_in_project ?? member.role_in_project]?.class]">
                         {{ roleConfig[member.pivot?.role_in_project ?? member.role_in_project]?.label || 'Member' }}
@@ -421,11 +419,11 @@ const statusConfig = {
 }
 
 // ── List projects ─────────────────────────────────────────
-const loading     = ref(false)
-const searchQuery = ref('')
-const hasMore     = ref(false)
+const loading        = ref(false)
+const searchQuery    = ref('')
+const hasMore        = ref(false)
 const currentPageNum = ref(1)
-const projects    = ref([])
+const projects       = ref([])
 
 const loadProjects = async (page = 1) => {
   loading.value = true
@@ -435,7 +433,7 @@ const loadProjects = async (page = 1) => {
     const list = Array.isArray(data) ? data : (data?.data ?? [])
     if (page === 1) projects.value = list
     else projects.value.push(...list)
-    hasMore.value    = !!res.data?.next_page_url
+    hasMore.value        = !!res.data?.next_page_url
     currentPageNum.value = page
   } catch { toast.error('Gagal memuat proyek.') }
   finally { loading.value = false }
@@ -444,10 +442,10 @@ const loadProjects = async (page = 1) => {
 const loadMore = () => loadProjects(currentPageNum.value + 1)
 
 // ── Departments & Users ───────────────────────────────────
-const { items: departments  } = useList('departments', { immediate: false })
-const { items: availableUsers } = useList('users',    { immediate: false })
+const { items: departments   } = useList('departments', { immediate: false })
+const { items: availableUsers } = useList('users',       { immediate: false })
 
-// ── Filtered computed ─────────────────────────────────────
+// ── Filtered ──────────────────────────────────────────────
 const filteredProjects = computed(() => {
   if (!searchQuery.value) return projects.value
   const q = searchQuery.value.toLowerCase()
@@ -477,8 +475,8 @@ const openEditModal = (project) => {
   isEditing.value = true
   Object.assign(formData, {
     id: project.id, name: project.name, description: project.description,
-    start_date: project.start_date?.substring(0, 10) ?? '',
-    end_date:   project.end_date?.substring(0, 10)   ?? '',
+    start_date:    project.start_date?.substring(0, 10) ?? '',
+    end_date:      project.end_date?.substring(0, 10)   ?? '',
     status:        project.status ?? 'planned',
     department_id: project.department_id,
   })
@@ -543,8 +541,8 @@ const closeDetailsModal = () => { showDetailsModal.value = false }
 const goToWorkspace     = (id) => router.push({ name: 'ProjectDetail', params: { id: String(id) } })
 
 // ── Members ───────────────────────────────────────────────
-const newMemberId   = ref('')
-const newMemberRole = ref(3)
+const newMemberId    = ref('')
+const newMemberRole  = ref(3)
 const isAddingMember = ref(false)
 
 const availableUsersForProject = computed(() => {
@@ -565,20 +563,14 @@ const addMember = async () => {
   finally { isAddingMember.value = false }
 }
 
-const { remove: removeMember } = useDelete('', {
-  confirmMessage: 'Hapus anggota ini dari proyek?',
-  confirmText:    'Hapus Anggota',
-  successMsg:     'Anggota berhasil dihapus.',
-})
-
+// FIX: useDelete dengan endpoint kosong diganti manual — hapus member via apiClient langsung
 const removeMemberFromProject = async (memberId) => {
-  const ok = await removeMember(memberId, { skipConfirm: false })
-  if (ok) {
-    try {
-      await apiClient.delete(`/projects/${selectedProject.value.id}/members/${memberId}`)
-      projectMembers.value = projectMembers.value.filter(m => m.id !== memberId)
-    } catch { toast.error('Gagal menghapus anggota.') }
-  }
+  if (!selectedProject.value) return
+  try {
+    await apiClient.delete(`/projects/${selectedProject.value.id}/members/${memberId}`)
+    projectMembers.value = projectMembers.value.filter(m => m.id !== memberId)
+    toast.success('Anggota berhasil dihapus.')
+  } catch { toast.error('Gagal menghapus anggota.') }
 }
 
 const updateMemberRole = async (memberId, roleId) => {

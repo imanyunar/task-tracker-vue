@@ -1,63 +1,80 @@
 <script setup>
 import { useRouter } from 'vue-router'
-
 const router = useRouter()
 </script>
 
 <template>
-  <div class="not-found">
-    <div class="not-found-content">
-      <h1 class="error-code">404</h1>
-      <h2>Page Not Found</h2>
-      <p>Sorry, the page you are looking for does not exist.</p>
-      <button @click="router.push('/')" class="btn-home">Go to Home</button>
+  <div class="relative min-h-screen flex items-center justify-center px-4 overflow-hidden bg-slate-950">
+
+    <!-- Ambient blobs -->
+    <div class="fixed top-0 -left-10 w-[500px] h-[500px] bg-indigo-600/8 rounded-full filter blur-[120px] animate-blob pointer-events-none"></div>
+    <div class="fixed -bottom-20 -right-10 w-[500px] h-[500px] bg-purple-600/8 rounded-full filter blur-[120px] animate-blob animation-delay-2000 pointer-events-none"></div>
+
+    <div class="relative z-10 text-center animate-slide-up">
+
+      <!-- 404 number -->
+      <div class="relative inline-block mb-6">
+        <div class="absolute inset-0 bg-indigo-500 blur-[80px] opacity-10 rounded-full"></div>
+        <p class="relative text-[9rem] md:text-[12rem] font-black leading-none tabular-nums text-gradient-primary" style="line-height:1;">
+          404
+        </p>
+      </div>
+
+      <!-- Icon -->
+      <div class="flex justify-center mb-6">
+        <div class="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+      </div>
+
+      <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight mb-3">
+        Halaman Tidak Ditemukan
+      </h1>
+      <p class="text-slate-500 text-sm max-w-sm mx-auto mb-8 leading-relaxed font-medium">
+        Halaman yang kamu cari tidak ada atau sudah dipindahkan. Coba kembali ke dashboard.
+      </p>
+
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <button
+          @click="router.push('/dashboard')"
+          class="btn btn-primary rounded-xl text-sm shadow-lg shadow-indigo-500/20 active:scale-95"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+          Ke Dashboard
+        </button>
+        <button
+          @click="router.back()"
+          class="btn-secondary btn-sm rounded-xl text-sm"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Kembali
+        </button>
+      </div>
+
+      <!-- dots decoration -->
+      <div class="flex justify-center gap-1.5 mt-10">
+        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 opacity-60"></span>
+        <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 opacity-60"></span>
+      </div>
     </div>
+
   </div>
 </template>
 
 <style scoped>
-.not-found {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 80vh;
+.animate-slide-up {
+  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
-
-.not-found-content {
-  text-align: center;
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
-.error-code {
-  font-size: 5rem;
-  font-weight: bold;
-  color: #667eea;
-  margin: 0;
-  line-height: 1;
-}
-
-.not-found-content h2 {
-  margin: 1rem 0 0.5rem 0;
-  color: #333;
-}
-
-.not-found-content p {
-  color: #666;
-  margin: 0 0 2rem 0;
-}
-
-.btn-home {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.btn-home:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-}
+.tabular-nums { font-variant-numeric: tabular-nums; }
 </style>

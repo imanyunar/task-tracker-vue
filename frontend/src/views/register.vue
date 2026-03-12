@@ -15,8 +15,8 @@ const form = ref({
 
 const isSubmitting = ref(false)
 
-// departments diambil langsung via useList (bukan staticDepartments lagi)
-const { items: departments } = useList('departments')
+// departments fetched via useList — loading state included
+const { items: departments, loading: loadingDepts } = useList('departments')
 
 const handleSubmit = async () => {
   const { name, email, password, password_confirmation, department } = form.value
@@ -87,14 +87,18 @@ const handleSubmit = async () => {
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-2 ml-1">Departemen</label>
             <div class="relative">
-              <select v-model="form.department" :disabled="loadingDepts">
-                  <option value="" disabled>
-                    {{ loadingDepts ? 'Memuat...' : 'Pilih Departemen' }}
-                  </option>
-                  <option v-for="dept in departments" :key="dept.id" :value="dept.id">
-                    {{ dept.name }}
-                  </option>
-                </select>
+              <select
+                v-model="form.department"
+                :disabled="loadingDepts"
+                class="w-full appearance-none px-5 py-4 bg-slate-950/50 border border-slate-700 rounded-2xl text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all disabled:opacity-50"
+              >
+                <option value="" disabled>
+                  {{ loadingDepts ? 'Memuat...' : 'Pilih Departemen' }}
+                </option>
+                <option v-for="dept in departments" :key="dept.id" :value="dept.id">
+                  {{ dept.name }}
+                </option>
+              </select>
               <div class="absolute inset-y-0 right-5 flex items-center pointer-events-none text-slate-500">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
               </div>
@@ -122,8 +126,8 @@ const handleSubmit = async () => {
             </div>
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             class="group relative w-full py-4 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl text-white font-black text-lg shadow-xl shadow-indigo-500/20 hover:shadow-indigo-500/40 active:scale-[0.98] transition-all overflow-hidden disabled:opacity-50"
             :disabled="isSubmitting"
           >
@@ -148,13 +152,13 @@ const handleSubmit = async () => {
         </div>
 
         <p class="text-center text-slate-400 font-medium">
-          Sudah punya akun? 
+          Sudah punya akun?
           <router-link to="/login" class="text-indigo-400 hover:text-indigo-300 underline underline-offset-4 decoration-indigo-500/30 font-bold transition-colors ml-1">
             Masuk Sekarang
           </router-link>
         </p>
       </div>
-      
+
       <p class="text-center text-slate-600 text-xs mt-8 font-medium tracking-wide">
         &copy; 2026 TASKTRACKER ECOSYSTEM. ALL RIGHTS RESERVED.
       </p>
@@ -163,46 +167,20 @@ const handleSubmit = async () => {
 </template>
 
 <style scoped>
-/* Animations */
-.animate-blob {
-  animation: blob 10s infinite;
-}
-.animate-slide-up {
-  animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
+.animate-blob { animation: blob 10s infinite; }
+.animate-slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+.animation-delay-2000 { animation-delay: 2s; }
 
 @keyframes blob {
   0%, 100% { transform: translate(0, 0) scale(1); }
   33% { transform: translate(40px, -60px) scale(1.1); }
   66% { transform: translate(-30px, 30px) scale(0.9); }
 }
-
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(40px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Notification Transition */
-.notification-enter-active {
-  animation: notifyIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-.notification-leave-active {
-  animation: notifyIn 0.3s reverse ease-in;
-}
-
-@keyframes notifyIn {
-  from { opacity: 0; transform: translate(-50%, -100%); }
-  to { opacity: 1; transform: translate(-50%, 0); }
-}
-
-.animation-delay-2000 { animation-delay: 2s; }
-
-/* Custom Scrollbar for Select */
-select::-webkit-scrollbar {
-  width: 6px;
-}
-select::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 10px;
-}
+select::-webkit-scrollbar { width: 6px; }
+select::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
 </style>
