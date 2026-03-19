@@ -2,8 +2,8 @@ import axios, { AxiosInstance } from 'axios'
 
 // Membuat instance axios
 const apiClient: AxiosInstance = axios.create({
-  // Sesuaikan dengan URL base backend Laravel Anda
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+  // URL Hardcoded untuk memastikan koneksi ke Alwaysdata
+  baseURL: 'https://tasktracker.alwaysdata.net/api',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
