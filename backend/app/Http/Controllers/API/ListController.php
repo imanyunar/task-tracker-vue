@@ -139,11 +139,17 @@ class ListController extends Controller
             });
         }
 
-        if ((int) $user->role_id !== 1) {
+        if ((int) $user->role_id === 1) {
+            // Admin: Lihat semua, tidak perlu filter tambahan
+        } elseif ((int) $user->role_id === 2) {
+            // Manager: Lihat proyek di departemennya ATAU proyek di mana dia jadi anggota
             $query->where(function ($q) use ($user) {
                 $q->where('department_id', $user->department_id)
                   ->orWhereHas('members', fn ($q) => $q->where('user_id', $user->id));
             });
+        } else {
+            // Employee / Lainnya: HANYA lihat proyek di mana dia jadi anggota (diundang)
+            $query->whereHas('members', fn ($q) => $q->where('user_id', $user->id));
         }
 
         $projects = $query->get()->transform(function ($project) use ($user) {
