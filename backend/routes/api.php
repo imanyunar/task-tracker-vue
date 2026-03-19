@@ -7,6 +7,15 @@ use App\Http\Controllers\API\CreateController;
 use App\Http\Controllers\API\UpdateController;
 use App\Http\Controllers\API\DeleteController;
 
+// MANUAL CORS FALLBACK (Bila config/cors.php tidak mempan)
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Origin, Content-Type, Accept, Authorization, X-Request-With');
+
+if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    exit;
+}
+
 
 Route::post('/register', [CreateController::class, 'register']);
 Route::post('/login',    [CreateController::class, 'login']);
